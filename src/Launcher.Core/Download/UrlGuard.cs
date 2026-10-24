@@ -24,6 +24,7 @@ public static class UrlGuard
         "resources.download.minecraft.net",
         "libraries.minecraft.net",
         "bmclapi2.bangbang93.com",
+        "bmclapi2.sakura.exp.dog",
         "api.modrinth.com",
         "cdn.modrinth.com",
         "maven.minecraftforge.net",

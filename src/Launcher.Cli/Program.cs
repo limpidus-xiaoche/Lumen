@@ -14,6 +14,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 var launcherPaths = LauncherPaths.CreateDefault(LauncherPaths.IsPortableRequested(args));
 launcherPaths.EnsureCreated();
+// 移除 --portable，避免 System.CommandLine 将其视为未知选项
+var cliArgs = args.Where(a => !string.Equals(a, "--portable", StringComparison.OrdinalIgnoreCase)).ToArray();
 var manifestClient = new ManifestClient(launcherPaths);
 var resolver = new VersionResolver(manifestClient, launcherPaths);
 var javaLocator = new JavaLocator(launcherPaths);
@@ -37,6 +39,12 @@ var installer = new VanillaInstaller(
     sqlite,
     NullLogger<VanillaInstaller>.Instance,
     loaderInstaller);
+var modpackInstaller = new ModpackInstaller(
+    launcherPaths,
+    downloads,
+    installer,
+    sqlite,
+    NullLogger<ModpackInstaller>.Instance);
 var accounts = new AccountStore(launcherPaths);
 var microsoft = new MicrosoftAuth();
 var authlib = new AuthlibAuth();
@@ -64,7 +72,8 @@ var facade = new LauncherFacade(
     accounts,
     microsoft,
     authlib,
-    loaderCatalog);
+    loaderCatalog,
+    modpackInstaller);
 
 var root = new RootCommand("Lumen CLI");
 
@@ -517,6 +526,55 @@ importCommand.SetAction(result =>
     }
 });
 
+var modpackPathArgument = new Argument<string>("file")
+{
+    Description = "整合包文件（.zip/.mrpack/.mmc/.hmcl）或目录",
+};
+var modpackNameOption = new Option<string>("--name")
+{
+    Description = "实例显示名（默认使用整合包名称）",
+};
+var modpackKindOption = new Option<string>("--kind")
+{
+    Description = "整合包类型：auto（默认）| modrinth | hmcl | multimc | curseforge",
+};
+
+var modpackInstallCommand = new Command("install", "安装整合包");
+modpackInstallCommand.Arguments.Add(modpackPathArgument);
+modpackInstallCommand.Options.Add(modpackNameOption);
+modpackInstallCommand.Options.Add(modpackKindOption);
+modpackInstallCommand.SetAction(result =>
+{
+    var file = result.GetValue(modpackPathArgument)
+        ?? throw new ArgumentException("缺少整合包路径");
+    var kindText = (result.GetValue(modpackKindOption) ?? "auto").Trim().ToLowerInvariant();
+    var kind = kindText switch
+    {
+        "auto" => ModpackKind.Modrinth, // auto 时由安装器内部自动识别
+        "modrinth" => ModpackKind.Modrinth,
+        "hmcl" => ModpackKind.Hmcl,
+        "multimc" => ModpackKind.MultiMc,
+        "curseforge" => ModpackKind.CurseForgeDirect,
+        _ => throw new ArgumentException($"未知的整合包类型：{kindText}"),
+    };
+
+    var request = new ModpackInstallRequest(
+        file,
+        result.GetValue(modpackNameOption),
+        IsolationLevel.ModsConfig,
+        kind);
+
+    var progress = new SyncProgress<InstallProgress>(p =>
+        Console.WriteLine($"[{p.Stage}] {p.Percent:F1}% {p.Message}"));
+
+    var summary = facade.InstallModpackAsync(request, progress, CancellationToken.None)
+        .GetAwaiter().GetResult();
+    Console.WriteLine($"installed id={summary.Id} version={summary.VersionId} loader={summary.Loader} state={summary.State}");
+});
+
+var modpackCommand = new Command("modpack", "整合包操作");
+modpackCommand.Subcommands.Add(modpackInstallCommand);
+
 var deleteInstanceArgument = new Argument<string>("instance")
 {
     Description = "要删除的实例 ID",
@@ -629,13 +687,14 @@ root.Subcommands.Add(instancesCommand);
 root.Subcommands.Add(modsCommand);
 root.Subcommands.Add(modsToggleCommand);
 root.Subcommands.Add(importCommand);
+root.Subcommands.Add(modpackCommand);
 root.Subcommands.Add(deleteCommand);
 root.Subcommands.Add(loginCommand);
 root.Subcommands.Add(accountsCommand);
 root.Subcommands.Add(useCommand);
 root.Subcommands.Add(logoutCommand);
 
-return root.Parse(args).Invoke();
+return root.Parse(cliArgs).Invoke();
 
 static LoaderKind ParseLoader(string text) => text.Trim().ToLowerInvariant() switch
 {

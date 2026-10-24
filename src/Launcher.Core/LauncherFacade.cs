@@ -27,6 +27,7 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly MicrosoftAuth? _microsoft;
     private readonly AuthlibAuth? _authlib;
     private readonly LoaderCatalog? _loaderCatalog;
+    private readonly ModpackInstaller? _modpackInstaller;
 
     public LauncherFacade(
         LauncherPaths paths,
@@ -41,7 +42,8 @@ public sealed class LauncherFacade : ILauncherFacade
         AccountStore? accounts = null,
         MicrosoftAuth? microsoft = null,
         AuthlibAuth? authlib = null,
-        LoaderCatalog? loaderCatalog = null)
+        LoaderCatalog? loaderCatalog = null,
+        ModpackInstaller? modpackInstaller = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
@@ -56,6 +58,7 @@ public sealed class LauncherFacade : ILauncherFacade
         _microsoft = microsoft;
         _authlib = authlib;
         _loaderCatalog = loaderCatalog;
+        _modpackInstaller = modpackInstaller;
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
@@ -226,8 +229,15 @@ public sealed class LauncherFacade : ILauncherFacade
     }
 
     public Task<InstanceSummary> InstallModpackAsync(
-        ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现整合包安装。");
+        ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        if (_modpackInstaller is null)
+        {
+            throw new NotSupportedException("整合包安装器未注入。");
+        }
+
+        return _modpackInstaller.InstallAsync(request, progress, ct);
+    }
 
     public async Task<GameSession> LaunchAsync(
         string instanceId, IProgress<LaunchEvent> events, CancellationToken ct)

@@ -41,6 +41,8 @@
 - [ ] **M5（B）**：安装向导（版本 + 加载器 + 加载器版本列表）（B 负责）
 - [x] **M6（A）完成**：`root_path` 作为 gameDir 权威、MultiMC/HMCL/原生实例复制导入、模组扫描与启停、删除保留存档、CLI `mods/mods-toggle/import/delete`
 - [ ] **M6（B）**：实例管理页、模组列表、导入向导、删除确认（B 负责）
+- [x] **M7（A）完成**：Modrinth / HMCL / MultiMC 整合包导入（CF 仅直链包）、清单依赖下载 + SHA1 校验、overrides 复制、CLI `modpack install`；实机验证 1.21.1 + Fabric 0.20.1 + Sodium 导入后可启动
+- [ ] **M7（B）**：拖拽导入、依赖确认、结果页（B 负责）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -328,4 +330,21 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              测试增至 78 项（新增模组扫描/启停、MultiMC/原生识别与复制、保留存档删除、外部目录保护）。
              真机：模组扫描与启停通过；MultiMC 目录导入成功（未复制 libraries）；delete --keep-saves 导出存档并删除；
              清理了验证用假 mod（该 jar 因 PowerShell 写入 BOM 导致 Fabric 解析失败，与启动器无关）。
+
+[2026-10-24] 选型咨询：`viettranx/3dviz-pro-max` 能否用作前端？
+             结论：**不能**。它不是一个前端框架/组件库，而是 Claude Code / Codex 的 agent skill
+             （工作流提示词 + Three.js 示例工程 + 素材配方），产物是浏览器里的 Three.js/Blender 场景。
+             与 Lumen 的 Avalonia 11 原生桌面栈无交集：接入需嵌 WebView2（Electron 路线），
+             会击穿冷启动 ≤1.5s 与内存预算，并破坏「Core 无 UI 依赖 / App 只消费 ILauncherFacade」分层；
+             且随附资产含 CC BY-SA（BodyParts3D）与权利未确认项，违反「随包第三方须 MIT 兼容」。
+             可用范围仅限：视觉/光照/相机调子的**设计参考**；或将来的**官网落地页**（浏览器环境）。
+             若确要 Web 前端，属架构级决策（建议单独评估 Tauri 而非 Electron），不在本轮范围。
+
+[2026-10-24] 首页 3D 效果方案（适配 Avalonia 12.1.4 / .NET 10）：
+             已核实：`Avalonia.OpenGL`（含 `OpenGlControlBase`）随主包提供，无需额外包。
+             选型：**方案 A = Composition 分层视差（主）**，方案 B = `OpenGlControlBase` 真 3D（可选增强，需降级），
+             方案 C = 预渲染序列帧（否决，体积与解码吃冷启动预算，且 Avalonia 无原生动图播放）。
+             硬约束：仅 App 层实现（Core 不做 UI 依赖）；首页可见才渲染；失焦/最小化停；GL 初始化延迟到首帧后；
+             GL 不可用（RDP/软件渲染/ANGLE 失败）自动降级到 A；新增设置项 `Enable3DHero` 默认开、低配自动关。
+             待实测：`CompositionVisual.TransformMatrix` 在 12.1.4 是否公开（决定真透视还是 2D 伪纵深）。
 ```

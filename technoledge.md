@@ -818,7 +818,7 @@ docs: 契约 v0.5
 
 ### M7 整合包
 
-- `[A]` Modrinth / HMCL / MultiMC（CF 不验收，仅直链包可导入）；只补清单声明的依赖
+- `[A]` Modrinth / HMCL / MultiMC（CF 不验收，仅直链包可导入）；只补清单声明的依赖 — **A ✅ 2026-10-24**
 - `[B]` 拖拽导入、依赖确认、结果页
 - **验收**：Modrinth / HMCL / MultiMC 导入后直接可启动；**CF API 路线不验收**（仅直链包可导入）；缺失依赖只补清单声明项。
 
