@@ -45,6 +45,8 @@
 - [ ] **M7（B）**：拖拽导入、依赖确认、结果页（B 负责）
 - [x] **M8（A）完成**：`integrity.json` 快/全量校验（mtime 缓存，失败 E8002）、更新清单解析 + 流式 SHA-256 下载校验 + 版本单调（E8001）、诊断包脱敏导出、便携模式写探测与回退、CLI `integrity / update check|apply / diagnostics`、`scripts/pack.ps1` + `scripts/verify-integrity.ps1` + `.github/workflows/release.yml`（Velopack Setup.exe + Portable.zip，无 MSI）
 - [ ] **M8（B）**：更新入口、首次启动引导、白名单帮助页、日志轮转设置（B 负责）
+- [x] `ui.md` v1 草案复审（2026-10-24）：P0 7 / P1 12 / P2 10，见下「ui.md 复审记录」；待回写 v1.1 后再进 S1
+- [x] `ui.md` 第二轮复审（**v1.1**，2026-10-24）：P0 4 / P1 12 / P2 10；v1 的 7 项 P0 已回写，见下「ui.md 复审记录（第二轮 · v1.1）」
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -208,6 +210,94 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 
 > 决策：Velopack 原生 feed 重命名为 `velopack.<channel>.json`，避免与 §12.1 固定字段的 `releases.<channel>.json` 冲突；Lumen 不消费 Velopack feed，直接按固定清单下载 Setup.exe 并校验后启动。
 > 未做：真实「旧版升级到新版」端到端流程（需先发布一个旧 tag）；更新 UI 属 B 部分。
+
+## ui.md 复审记录（v1 草案，2026-10-24）
+
+> 结论：方向（世界层 + 2D 面板 + 可回退经典模式）可执行，S0 已把最大不确定性（CompositionVisual 3D API、Blender headless）探掉；
+> 但 7 项 P0 会让验收直接失败或产生结构性返工，建议先出 `ui.md` v1.1 再进 S1。
+>
+> 已核实（本机程序集/包元数据）：
+> `Avalonia 12.1.4` 含 `CompositionVisual` / `ElementComposition` / `GetElementVisual` / `OpenGlControlBase` / `GlInterface`；
+> `SharpGLTF.Core 1.0.5`（MIT，net8.0 无额外依赖，不引 Newtonsoft）；`NAudio 3.0.1` + `NAudio.Vorbis 3.0.0`（MIT，net9.0，需 NAudio 3 拆包）；
+> `StbImageSharp`（`Unlicense OR MIT`）。均与 MIT 兼容，但必须登记 `THIRD_PARTY_NOTICES.md`。
+
+P0（阻断验收 / 结构性返工）：
+
+1. **ESC 三重语义 + 无边框回退死路**：P1「ESC 退出全屏」、S2「Esc 返回」、S3「Esc 关闭面板」冲突；`SystemDecorations=None` 常驻时退出全屏会得到不可移动/不可关闭的窗口。需定义 ESC 优先级（模态 > 面板 > 全屏）并让装饰随窗口状态切换。
+2. **状态源缺「恢复」且无法表达并发**：S4 只绑进程内 `IProgress`，未使用 `GetTasksAsync` / `GetRunningSessionsAsync`（均已存在），重启后安装/运行态丢失；单一 `SceneState` 无法同时表达「两扇门在安装、一扇在运行、一扇报错」。应改为「每门实例态 + 全局态派生」。
+3. **3D 面板/图标的命中测试未验证**：`CompositionVisual` 的 `Offset/Scale/Orientation` 属合成层属性，Avalonia 命中测试基于 Visual 变换与布局边界，按钮可能点不到；且位移后会被父级 `ClipToBounds` 裁切。需在 S2/S3 前做 spike，回退方案：`RenderTransform`（参与命中测试）+ `ZIndex` 排序。
+4. **降级矩阵写了不存在的 API**：`SystemParameters.IsRemoteSession` 是 WPF，Avalonia 无 `SystemParameters`（改用 `GetSystemMetrics(SM_REMOTESESSION)`）；软件渲染下 `OpenGlControlBase` 根本起不来，不可能「≥20fps」，应统一归入「GL 不可用 → 静态背景」。`GC.GetGCMemoryInfo()` 也不等于物理内存（用 `GlobalMemoryStatusEx`）。
+5. **UI 专属设置项缺位，与「Core 不改一行」冲突**：`ClassicMode` / 全屏窗口模式 / `Enable3DHero` / 音量 / 减少动效在 [SettingsModels.cs](file:///D:/启动器/src/Launcher.Protocol/Settings/SettingsModels.cs#L17-L40) 的 `AppSettings` 与 `AppSettingsPatch` 中都不存在。要么新增 App 级 `ui.json`，要么改 Protocol（并撤回「Core 不改一行」）。
+6. **验收指标自相矛盾/不可测**：包体基线 `68MB` 是 Setup.exe（Portable.zip 60.9MB，publish 242 文件），不能当发布目录基线；「内存增量 ≤120MB」与 technoledge §6.10「UI 空闲内存 <150MB」冲突；核显无法测「显存 <300MB」；「空闲 CPU <3%」与「8s 公转 + 粒子常驻」互斥。
+7. **阶段范围与 M2–M8（B）不对齐**：S3 只列 5 个面板，缺任务中心、更新入口、安装向导、导入向导、首次引导、诊断/完整性阻断页；而 §3.3 又说日志「切经典 2D 页」，自相矛盾。照此实施会漏掉 B 侧已承诺的验收项。
+
+P1（文档一致性 / 关键技术细节）：
+
+1. §0 冲突裁决写「technoledge.md §7（UI 规范）」——§7 实为数据与文件布局，UI 规范在 §6.10；条款失效且未声明是否覆盖 §6.10 的性能预算。
+2. 图层顺序错误：`L1 后处理遮罩（纯 2D）`必须在世界层之上、面板层之下，否则暗角/色差无法作用于 GL 画面（应插在 L2 与 L3 之间）。
+3. `L4 Tooltip/弹窗层 IsHitTestVisible=false` 与「弹窗」职责冲突，确认框/登录码需要可交互层，应拆 `TooltipLayer`（穿透）与 `ModalLayer`（可交互）。
+4. 「世界层与面板层共用同一 `Camera`/`ViewProjection`」不可实现：`CompositionVisual` 无投影矩阵，只能共用相机参数后在 CPU 复算每面板 TRS + `scale=focal/z`。
+5. 文字清晰只覆盖了 GL，未覆盖**合成层缩放/旋转**：控件先按原始尺寸栅格化再变换，放大与倾斜会发虚。应约束面板 `scale∈[0.9,1.1]`、以位移为主，或 2x 离屏栅格化（并计入内存）。
+6. DPI/多显示器全缺：GL 用物理像素、面板用 DIP、`RayPicker` 必须乘 `RenderScaling`；全屏落在哪块屏、窗口模式记忆位置也未定义。
+7. 启动时序算术不成立：推镜 600ms + 白闪 250ms 后才 `LaunchAsync`，却要求「点击到进程启动 ≤1.2s」，JVM/凭据刷新预算只剩 350ms。应并行触发或把指标放宽到 2s。
+8. 两套 GL 绑定未划界：`Silk.NET.OpenGL` 与 `OpenGlControlBase` 的 `GlInterface` 会各自加载入口点；且 Windows 下是 ANGLE/GLES（GLSL ES、无桌面 GL 独占特性），需明确只保留一套，或由 App 用 `GetProcAddress` 注入。
+9. 「永不黑屏」未覆盖运行期故障：驱动更新/TDR/GL 上下文丢失、初始化成功后崩溃，需重建上下文或直接降级。
+10. 音频依赖与预算：`NAudio` 必须钉 3.x 并显式引 `NAudio.Wasapi`（`WasapiOut` 所在），`NAudio.Vorbis 3.0` 只配 NAudio 3；3MB Ogg(q4,≈128kbps) 只有 2–3 分钟，环境循环会明显重复；`ffmpeg/libvorbis` 是构建期外部依赖，需写明且不入包。
+11. 隐私与行为缺失：`--demo`/截图模式未脱敏账户名与路径（与 `DiagnosticsExporter` 标准不一致）；README 早前决定的「失焦/最小化停渲染」未落到阶段任务；游戏 Running 时 BGM 是继续还是淡出未定义。
+12. A/B 边界自相矛盾：§7 说 `App/Shell|World|Panels|Audio` 归 B，S1 任务却全是 App 改动；与「自 B 首次提交起 A 不再改 App」冲突。需明确 S1 由谁执行（A 只交付 `Launcher.Render` + 骨架草案）。
+
+P2（工程细节）：
+
+1. 门布局参数：`Opacity = 0.9 - 0.12*index` 到第 7 扇为 0.18（近乎不可见），需 clamp；7/8 扇的「更多」边界要写清；S1 验收「符合 3.2 规则」应为 3.1。
+2. `RayPicker` 用 AABB 对 22° 旋转门不精确，应改 OBB 或包围球。
+3. 实例图标纹理规格缺失：尺寸上限、缓存、非 2 次幂、缺失图标回退。
+4. 「更多」列表需虚拟化（对齐 technoledge「50 实例 ≤200ms」）。
+5. `CompositionVisual` 每帧改属性 vs 用合成动画未定；面板重挂载后需重新获取 visual 并重放变换。
+6. 缺单实例二次启动激活、窗口位置记忆、关闭/最小化/关于/许可/第三方声明入口。
+7. 可测性埋点不足：需要 `LUMEN_DISABLE_GL=1` 强制降级、`--demo` 脚本、帧时间采样导出，否则 S1/S6 验收靠肉眼。
+8. 缺单测清单：`PortalLayout`（纯函数）、`RayPicker`、`CameraController`、`SceneStateMachine` 映射；S6 只有回归脚本。
+9. 构建细节：新包必须进 [Directory.Packages.props](file:///D:/启动器/Directory.Packages.props)（中央版本管理），`Launcher.Render` 继承 `net10.0-windows` 且 `TreatWarningsAsErrors=true`；S1 无外部资产时不必引 `SharpGLTF.Toolkit/Runtime`。
+10. 无障碍/减少动效：3D 门的键盘焦点可视化与 `AutomationProperties` 缺失；白闪与报错脉冲应受「减少动效」约束；运行中实例应禁用删除/改版本（项目硬约束）。
+
+## ui.md 复审记录（第二轮 · v1.1，2026-10-24）
+
+> 审查对象已是 v1.1：v1 的 7 项 P0 全部回写（ESC 返回栈 + 装饰恢复、每门状态 + 重启恢复、命中测试策略 + Spike、真实降级 API、设置字段扩展、指标基线、11 面板、图层顺序、GlInterface/GLSL ES、上下文丢失、NAudio 版本、DPI）。
+> 本轮基于 Avalonia 12.1.4 源码/官方文档与现有 App 代码复核，仍有 **P0 4 / P1 12 / P2 10**。
+
+P0（仍会阻断 S1/S6）：
+
+1. **门到底由谁渲染，自相矛盾**：§3.2 写“传送门/图标 = `CompositionVisual` 3D + 自定义射线拾取”，但 S1 任务 5/7 在 `WorldView(OpenGlControlBase)` 里画门框/门内，§8.2 门内还需要“流动噪声/星尘”shader。门若走合成层，就没有 GL 深度/雾/光照，门内 shader 无处安放；门若走 GL，§3.2 表格、图标、键盘焦点与 `AutomationProperties` 都要重写。必须二选一并全文统一。
+2. **截图链路仍不成立**：§1.4/S6 要求按物理像素导出 2560×1440。已核对 Avalonia 源码：`OpenGlControlBase` 把 GL 画面挂成 composition **child visual**（`ElementComposition.SetElementChildVisual`）；官方文档明确 `RenderTargetBitmap` 为软件渲染、GPU 路径“可能无法正确渲染”。必须改为 `glReadPixels` + 面板离屏合成，或屏幕捕获再缩放。§3.4 用 `RenderTargetBitmap` 做面板 2× 可以，但那只覆盖面板，不覆盖世界层。
+3. **Avalonia 12 窗口 API 未对齐**：§1.1 表与代码仍用 `SystemDecorations`；12 的公开属性是 `WindowDecorations`（Full/BorderOnly/None），`SystemDecorations` 已不在窗口属性文档（二进制仍有符号，疑为兼容/Obsolete）。项目 `TreatWarningsAsErrors=true`，若确为 Obsolete，S1 第 2 条任务即构建失败；另 `WindowState` 已变 direct property，不能用样式驱动全屏切换。
+4. **平台渲染后端未锁定**：`OpenGlControlBase` 依赖 `TryCreateCompatibleGlContextAsync`（compositor 的 GL 互操作）；Win32 后端有 `AngleEgl`/`Wgl`/`Vulkan`/`Software`，当前 [Program.cs](file:///D:/启动器/src/Launcher.App/Program.cs#L56-L60) 只调 `UsePlatformDetect()`。若落到 Vulkan/Software，世界层必失败。§3.5 断言“Windows 走 ANGLE/GLES”不等于配置；需显式设 `Win32PlatformOptions.RenderingMode` 并保留能力探测。
+
+P1（关键细节）：
+
+1. **`Launcher.Render` 与 `GlInterface` 冲突**：§10 说 `Launcher.Render` 不引 Avalonia，§3.5 说只用 Avalonia 的 `GlInterface`——后者是 `Avalonia.OpenGL` 类型。需改成“`Render` 只做数学/场景，GL 调用经 `IGlApi`/函数指针由 App 注入”，或允许 Render 依赖 `Avalonia.OpenGL`。
+2. **§1.4 的源码事实错误**：`OnOpenGlRender(GlInterface gl, int fb)` 没有 w/h 参数，“`RenderScaling` 已计入 w/h”不成立；像素尺寸需自行算 `Bounds × TopLevel.RenderScaling`（源码内部 `GetPixelSize` 同法）。`ctx.IsLost` 也不可访问，应改用 `OnOpenGlLost` 回调或 `glGetError() == GL_CONTEXT_LOST`。
+3. **§3.3 投影代码单位混用**：`focal` 用 `heightPx`，`screen` 返回 DIP，`RenderTransform` 也是 DIP；且 `RenderTransformOrigin` 默认是中心，`Matrix.CreateScale * Translate` 会整体偏移半个面板。需统一 DIP 并把 `RenderTransformOrigin` 设为 `TopLeft`。
+4. **仿射变换无法“倾斜”**：§3.2/§3.4 规定面板只用仿射 `RenderTransform`，但 S4 验收仍写“面板倾斜 ≤15° 时正文可读”。要么删掉倾斜要求（全部 billboard），要么明确是 2D skew 而非 3D 倾斜。
+5. **§3.6 的“1s 无帧 = 上下文丢失”会误判**：S1 任务 8 要求失焦/最小化停渲染、空闲 30fps，暂停超过 1s 必触发“丢失→重建→降级”。计时必须只在“窗口可见 + 已请求渲染”时进行。
+6. **§4.2 启动第 4 步不可行**：`GetInstanceAsync` 只读 DB 详情，不做版本目录校验；对每个实例做目录完整性校验会击穿 1.5s。应读 DB `state` 字段，深度校验放到打开实例面板/修复时。
+7. **相机默认值仍缺**：有 `Camera` 结构但没有位置、FOV、near/far 与场景单位；22°/2.2/0.35 与 `focal` 无法复现，S1“位置/缩放/不透明度符合 §8.1”不可计算。§14 未决 4 仍是 4:3 安全区，但 S4 已要求 4:3 不裁切，S6 又计划竖版。
+8. **首帧关键路径仍未定义**：manifest 刷新、更新检查、完整性快校验、音频初始化没有“延后 + 可取消”规则；[App.axaml.cs](file:///D:/启动器/src/Launcher.App/App.axaml.cs#L21-L38) 仍在 UI 线程同步初始化 Core/DB，1.5s 预算无法保证。
+9. **Core 失败静默回退 Fake**：同文件 L24-32 初始化失败就切 `FakeLauncherFacade`，界面照常显示假实例/假进度；S1/S3 验收会被假数据骗过。需要显式“降级模式”横幅并禁用写操作。
+10. **音频设备失败无兜底**：RDP/无声卡/被占用时 `WasapiOut` 初始化失败，不能让 S5“首帧不受影响”变成异常；需静默降级 + 设备热插拔。
+11. **快捷键作用域仍只覆盖 ESC**：§1.2 没定义输入框/ComboBox/IME 组合态下 `Space`/`Enter`/`Tab` 的优先级（Space 既会打字也会启动门）；Avalonia 12 的 AccessKey 语义也已改变。
+12. **§11 取消 A/B 与既有协作规则冲突**：README 待办、`technoledge.md` 分工、项目记忆里仍有“App 仅由 B 修改”。需同步更新，否则其他 Agent 会按旧规则拒绝改 App。另 `Launcher.App.csproj` 仍设 `AvaloniaUseCompiledBindingsByDefault=false`（12 默认 true），11 个面板的绑定会退回反射。
+
+P2（工程细节）：
+
+1. 全文 `technoledg.md` 拼写错误（7 处），实际文件是 `technoledge.md`，会误导其他 Agent。
+2. §5 诊断与关于放在“石碑背面”不可发现，设置面板里也要有入口。
+3. §6.1 `EnableEnhanced3D` 注释“B 层”是 v1 遗留概念，与 §11 取消 A/B 冲突。
+4. `AppSettings.AccentColor`（默认蓝）与固定 `--accent #8B5CF6` 双源未处理。
+5. `--demo` 用真实数据且全自动，可能真实启动游戏/写实例；脱敏按用户决定不做，但应至少限定只读快照或显式确认。
+6. §3.6 自造 `E9001` 未进错误码表（technoledge 要求码 + i18n key）。
+7. §12.1 缺 `InputRouter` 返回栈、窗口状态机/位置钳制、PanelHost 投影数学、音频状态机、设置迁移的单测。
+8. §13 “ANGE” 拼写；CI 静态检查 GLSL 没有落地方案（需 glslangValidator/ANGLE 工具链）。
+9. §9.1 的空闲 30fps / CPU <5% 没有对应验收项（S1/S6 只测 60fps 与失焦）。
+10. `#version 300 es` 依赖 GLES3 上下文；未写最低版本检查与 GLES2 回退（`OpenGlControlBase.GlVersion` 可用）。
 
 ## 目标样本
 
@@ -386,6 +476,16 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              GL 不可用（RDP/软件渲染/ANGLE 失败）自动降级到 A；新增设置项 `Enable3DHero` 默认开、低配自动关。
              待实测：`CompositionVisual.TransformMatrix` 在 12.1.4 是否公开（决定真透视还是 2D 伪纵深）。
 
+[2026-10-24] 首页 3D 完整方案定稿（宣传导向）：
+             视觉概念「维度之门」：5 层视差 diorama + 悬浮启动卡 + 火花/浮尘，青橙对比配色；
+             A 层（Composition 视差 + 粒子 + 光晕）为**主体**，常开；
+             B 层（OpenGlControlBase 真 3D：旋转方块/星空）为**用户可选项**，默认关，实验性；
+             场景状态机 5 态：Idle / Installing / Launching / Running / Error，直接映射 Core 的
+             TaskRegistry / InstallProgress / LaunchEvent，实现「功能融入视觉」；
+             新增宣传模式：截图模式（固定构图导出 2560×1440）+ 演示脚本 + 隐私脱敏（假账户/假路径）；
+             性能闸门：首页可见才渲染、失焦停表、GL 延迟初始化、5 种降级场景不崩；
+             待拍板：色板、卡片布局、是否做首启入场动画、B 层默认值、宣传素材是否需要 4:3 安全区。
+
 [2026-10-24] M7（A）完成：
              ModpackInstaller：按文件名识别 Modrinth/HMCL/MultiMC/CF 直链（未知 E3004）；
              Parse 解析 MC 版本 + 加载器（Fabric/Forge/NeoForge）+ 文件清单（跳过 `env.client=unsupported`）；
@@ -403,6 +503,142 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              App 首行 `VelopackApp.Build().Run()`；scripts/pack.ps1（publish→integrity→vpk pack→固定清单）+ verify-integrity.ps1 + release.yml；
              实机：快校验 1 文件、全量 52 文件、同长度篡改 → E8002 exit 1、update check → E8001、diagnostics 6 条目；
              打包产物 Setup.exe 68,433,392 B / Portable.zip 60,918,322 B / nupkg，无 MSI；114 项测试通过；0 警告 0 错误。
+
+[2026-10-24] 沉浸式 3D 方案（全屏传送门 + BGM）：
+             环境核查：本机存在 Blender **5.2** 配置目录（路径未定位，不在 Program Files）；
+             `Avalonia.OpenGL` 随主包可用；**Shell 被 PS 执行策略阻断**，无法运行 blender/npx/dotnet/git。
+             Skills 核查：`arjun988/blender-skills`（94 技能，MIT）、`linnnn89/blenderskill`（123 手册）均为真；
+             两者只是文档/路由，真正驱动 Blender 还需 `ahujasid/blender-mcp`（MCP 服务）。
+             架构结论：Avalonia 无 3D 场景引擎，"所有东西 3D" 拆成 **世界层（OpenGL）+ 面板层（2D 控件透视投影）**；
+             若 `CompositionVisual.TransformMatrix` 不可用，则回退「控件 → RenderTargetBitmap → GL 纹理 → 四边形」。
+             新增：`src/Launcher.Render`（GL 渲染库）、NAudio+NVorbis 音频、SharpGLTF 加载、射线拾取、
+             保留「经典 2D 模式」回退；包体预计 68MB → ~100MB。
+             待验证 4 项：3D 变换 API / OpenGL 与 Avalonia 叠加 / Ogg 播放 / Blender headless 导出。
+
+[2026-10-24] S0 验证结果 + 用户拍板：
+             环境：Shell 已解禁；Blender `D:\Blender\blender\blender.exe` = **5.2.2 LTS**；dotnet 10.0.300；blender-mcp 已配。
+             ✔ **CompositionVisual 暴露 3D TRS**：`Offset/Translation/Scale/CenterPoint: Vector3D`、
+               `Orientation: Quaternion`、`RotationAngle` → 控件可直接做 3D 旋转/位移/缩放（路径 A′）。
+               未发现显式投影矩阵，透视靠「3D 旋转 + 按深度缩放 + 深度排序」近似，够用。
+             ✔ Blender headless 导出：factory-startup 导出 cube.glb（1936 B）成功，管线可用。
+             ⚠ Blender 会往安装目录写 `__pycache__`，沙箱只读 → 后续统一用 `--python-expr` 且接受告警，
+               或把 PYTHONPYCACHEPREFIX 指向工作区。
+             决定：文字一律 **2D 悬浮/弹窗**（GL 内不渲染文字）；
+                   每个传送门 = 一个实例；门楣上方悬浮实例图标，悬停显示名称 tooltip（2D 跟随）；
+                   保留经典 2D 模式；音乐用**原创 MC 风格环境曲**（MC 原声 C418/Mojang 版权，禁止随包）。
+
+[2026-10-24] `ui.md` 定稿（UI 层唯一实施依据）：末地紫色板 + 统一动效令牌；
+              阶段 S1 世界层骨架 → S2 传送门交互 → S3 面板 3D 化 → S4 状态动效 → S5 音频 → S6 硬化与宣传；
+              每阶段均含任务清单与**可测量验收标准**（60fps/≤80ms 悬停/≤200ms 进度同步/首帧 ≤1.5s 等）；
+              音乐走**自产合成**（tools/audio/gen_ambient.py，FM 电钢 + Schroeder 混响，ffmpeg 转 Ogg）；
+              门内为末地紫渐变；附录含降级矩阵、目录清单、A/B 分工与 6 条回退方案。
+
+[2026-10-24] ui.md v1 复审（P0 7 / P1 12 / P2 10，详见上节）：
+             关键阻断：ESC 三重语义 + 无边框窗口退出全屏后不可操作；S4 未接 GetTasksAsync/GetRunningSessionsAsync
+             导致重启后任务/运行态丢失且无法表达多实例并发；3D 面板命中测试未验证（CompositionVisual 变换
+             不参与 Visual 命中测试的风险）；降级矩阵用了 Avalonia 不存在的 SystemParameters.IsRemoteSession；
+             UI 专属设置项在 AppSettings/Patch 中不存在，与「Core 不改一行」冲突；包体/内存/CPU 指标基线混用且互斥；
+             S3 面板范围缺任务中心/更新/安装向导/首次引导/诊断，与 M2–M8（B）验收不符。
+             依赖已核：SharpGLTF.Core 1.0.5（MIT，无 Newtonsoft）、NAudio 3.0.1 + NAudio.Vorbis 3.0.0（MIT，
+             需 NAudio.Wasapi 显式引用）、StbImageSharp（Unlicense OR MIT），均需登记 THIRD_PARTY_NOTICES。
+             下一步：出 ui.md v1.1（先修 P0 与 §7 引用、图层顺序、状态模型、指标基线），再由 B 落 S1。
+
+[2026-10-24] `ui.md` **v1.1 已回写**（P0 7 / P1 12 / P2 10 全部落位）：
+             返回栈统一：ESC = Modal → 面板 → 全屏 → 退出确认；退出全屏恢复 `SystemDecorations=Full` 并钳制位置。
+             状态模型：每门一态 `PortalItem.PortalState` + 派生 `ShellMood`；启动时用
+             `GetRunningSessionsAsync`/`GetTasksAsync` 恢复，1s 轮询兜底，取消走 `CancelTaskAsync(taskId)`。
+             命中测试：**交互控件禁用 CompositionVisual**，一律布局 + `RenderTransform`；门/图标走 OBB 射线拾取；
+             `ClipToBounds=false`；S2 第一项就是命中 Spike。
+             降级 API 换成真的：`GetSystemMetrics(SM_REMOTESESSION)`、`GlobalMemoryStatusEx`、`LUMEN_DISABLE_GL=1`；
+             软件渲染不再承诺帧率。
+             设置项：明确扩展 `AppSettings/AppSettingsPatch` 9 个 UI 字段（DTO 变更，业务逻辑不改），旧 JSON 走默认值。
+             指标对齐：UI 空闲内存 <150MB（technoledg §6.10）、空闲帧率上限 30fps + CPU <5%、包体基线改 Portable.zip 60.9MB。
+             面板补齐 11 个（任务中心/更新/安装向导/导入向导/首启引导/诊断阻断/关于许可）；日志固定走经典 2D。
+             其他：图层顺序改为 世界→后处理→面板→Tooltip→Modal；GL 只用 `GlInterface` 不引 Silk.NET（GLSL ES 3.0）；
+             上下文丢失/TDR 重建一次再降级；音频显式 `NAudio.Wasapi`，2 首 × 4 分钟；阶段顺序改为
+             状态(S3) 先于面板(S4)；S1 执行权归 **B**，A 只交付 `Launcher.Render` + 骨架草案。
+
+[2026-10-24] ui.md v1.1 修订（用户拍板）：
+             ① **不脱敏**：`--demo` 与截图模式一律使用真实数据，取消演示数据/`--demo-real`，§14 未决项 5 删除；
+             ② **取消 A/B 分工**：§11 改为「维护方式（不分工）」，全文不再有目录归属限制，
+                唯一硬约束是 Core 业务逻辑与 ILauncherFacade 契约不被 UI 反向改写；
+             ③ **暂不开工**：S1 暂不启动，等后续指令。
+
+[2026-10-24] `ui.md` **v1.2**（回写第二轮复审 P0 4 / P1 12 / P2 10，并修正 v1.1 自身事实错误）：
+             **P0-1 渲染归属定死**：门框/门内/图标一律 **GL 渲染**（才有深度/雾/shader），CompositionVisual 只用于无交互装饰；
+             键盘与读屏靠透明可聚焦的 `PortalFocusProxy`（Opacity=0、IsHitTestVisible=false、Focusable=true）。
+             **P0-2 截图链路改为离屏 FBO + `glReadPixels`**（GlInterface 未暴露则用 GetProcAddress），
+             2D 层单独 RTB 后手动 alpha 合成，不再指望 RenderTargetBitmap 抓 GL。
+             **P0-3 窗口 API 已核实**：`SystemDecorations` 虽存在但标 `[Obsolete]`，TreatWarningsAsErrors 会构建失败；
+             改用 `WindowDecorations`（None/BorderOnly/Full）。
+             **P0-4 后端锁定**：`Program.cs` 配 `Win32PlatformOptions.RenderingMode = AngleEgl → Wgl → Software`，
+             运行时校验 GLES ≥3.0，Vulkan/Software 直接降级。
+             **P1 修正**：`OnOpenGlRender(gl, fb)` 无尺寸参数（用 Bounds×RenderScaling 或 GetPixelSize）；
+             丢失用 `OnOpenGlLost()`；命名空间 `Avalonia.OpenGL.Controls`；`Launcher.Render` 改依赖自有 `IGlApi`；
+             投影统一 DIP + `RenderTransformOrigin=TopLeft`；面板取消倾斜验收；看门狗仅可见期计时；
+             启动恢复改读 DB state，深度校验延后；首帧关键路径、Fake 不静默回退、音频设备失败兜底、焦点作用域均已写死。
+             **P2**：technoledg 拼写全改、诊断/关于改设置内可见入口、AccentColor 单一来源、删 E9001、CI 加 glslangValidator。
+
+[2026-10-24] **S1 世界层骨架 已完成（首个可跑版本）**：
+             新增 `src/Launcher.Render`（已加入 Launcher.slnx，不依赖 Avalonia）：
+             `IGlApi` + 自有 GL 函数指针加载、`Vec3/Mat4`、`Camera`、`PortalLayout`（纯函数 + opacity clamp）、
+             `SceneRenderer`（天穹渐变、悬浮岛、门框、门内叠加发光、距离雾、GLES 3.0 版本闸门）。
+             App：
+             `Program.cs` 锁定 `Win32PlatformOptions`（AngleEgl→Wgl→Software，WinUIComposition→RedirectionSurface，PerMonitorDpiAware）；
+             `World/WorldView`（OpenGlControlBase 宿主，含 GlApiAdapter、60fps 节拍、失焦降 5fps、OnOpenGlLost 重建、首帧/帧时间埋点）；
+             `Shell/ImmersiveShell`（世界层 + 顶部导航 + 右侧经典页面浮层 + 降级横幅）；
+             `Shell/CameraController`（8s 公转 ±3° + 鼠标视差 ±2°）；`Shell/InputRouter`（ESC 栈 + F11，退出全屏恢复 WindowDecorations=Full 并钳制位置）；
+             `App.axaml.cs` 取消静默回退 Fake（仅 `--fake` 允许），Core 失败改为可见错误窗口。
+             **实测**：GL 后端 = `OpenGL ES 3.0 (ANGLE 2.1.1)` / Intel Arc 140T；真实 4 个实例 → 4 扇门；
+             `LUMEN_DISABLE_GL=1` 触发降级横幅且不崩；Debug/Release 均 0 警告 0 错误。
+             **未达标项**：首帧实测 5.2–8.1s（开发态、沙箱内、未 R2R），需在 R2R publish + 冷/热缓存条件下重测；
+             帧时间采样需窗口聚焦（失焦只跑 5fps，样本不足 120 帧不输出）。
+             下一步：S2 命中测试 Spike + 图标 billboard + Tooltip。
+
+[2026-10-24] 视觉整改 R1（末地风 + 下界门 + 原版方块资产）：
+             风格：天穹改末地虚空（近黑 + 紫灰雾带 + 程序化星点）；岛改末地石 + 紫珀镶边；远景加 5 根黑曜石柱；
+             门改为黑曜石框 + 多倍频漩涡 shader（极角随半径旋转）+ 地面低强度紫色光晕。
+             布局：门改为**以主门为中心左右交替展开**（0,+1,-1,+2,-2…），不再单侧堆叠。
+             资产管线（新）：`StbImageSharp` + `BlockModelLoader`（解析原版/Blockbench models，支持 parent 合并、UV、六面）；
+             `MinecraftAssetProvider` 从**用户本机** `versions/<ver>/<ver>.jar` 读 `end_stone`/`obsidian`/`purpur_block`
+             模型与贴图（不随包分发 Mojang 资产）；渲染器补纹理采样、UV 顶点属性、NEAREST 采样与图集外单贴图绑定；
+             找不到客户端 jar 时自动回退程序化配色。
+             修复：导航列表补 ItemTemplate（不再显示 `NavItem{...}` 的 ToString）；选中项改紫色；右侧浮层 640→470。
+             实测：`shot8.png`（_probe，不入库）显示末地石贴图、紫珀镶边、三门对称、漩涡正常；构建 0 警告 0 错误。
+             **仍待改**：岛只有 1 层厚、边缘规则；黑曜石框因贴图偏暗仍像平板；门底光斑仍偏亮；
+             第 4 扇门被右侧浮层遮挡；贴图整体偏亮（shader 里 `*1.6` 需要下调）。
+             下一步：岛加厚到 2–3 层并做不规则边缘、门框拉开块缝、贴图亮度校正、相机再抬高一点。
+
+[2026-10-24] 视觉整改 R2（真纹理打通 + 构图重排）：
+             修掉 4 个真 bug：
+             ① 原版模型 `block/cube_all` 的父级贴图写成 `#all`，直取 `Textures.Values.First()` 会拿到 `#all` →
+                新增 `BlockModelLoader.ResolveTexture/PickPrimaryTexture` 递归解引用；
+             ② shader 里 `mix(vColor, tint, uTextured)` 把顶点色整个丢掉，导致贴图压不暗 →
+                改为 `vColor * tint`；
+             ③ 门内用加色混合，把过亮地面透出来形成白斑 → 改标准 alpha 混合；
+             ④ jar 选择误取整合包模组 jar → 只认 `versions/<ver>/<ver>.jar` 且必须含 `models/block/end_stone.json`。
+             视觉：门框改为 0.45 块的黑曜石方块（2 柱 × 4 + 顶 2），内框与 UV 同步缩放；
+             岛缩为 7×6、两层、边缘随机缺块、顶点色压到 0.62；相机 12.6 / 3.15 / 目标 (0,1.15,-0.55)；
+             门半径 3.2、步进 30°；进度条改紫色（App.axaml style）。
+             实测：`shot18.png`（_probe）—— 原版末地石与黑曜石贴图、四门不重叠、完整岛体。
+             仍丑的点：门相对岛偏小、岛前缘有缺口、氛围光源与粒子全缺。
+             开源 UI 调研（本轮）：SukiUI(MIT, 6.x 针对 Avalonia 11.3.11)、Semi.Avalonia(MIT)、
+             Material.Avalonia(MIT)、FluentAvalonia(MIT)；XMCL(MIT, Vue/Vuetify) 可作交互参考，
+             Prism(GPL)/HMCL(GPL) 仅可参考不可复制代码。结论：暂不引入重型主题，先自建令牌。
+```
+[2026-10-24] ui.md **v1.1 第二轮复审**（P0 4 / P1 12 / P2 10，详见上节）：
+             已确认 v1 的 7 项 P0 全部回写；本轮用 Avalonia 12.1.4 源码复核后仍残留：
+             ① 门由 GL 还是 CompositionVisual 渲染，§3.2 与 S1 任务/§8.2 shader 自相矛盾；
+             ② 截图：OpenGlControlBase 把画面挂成 composition child visual，RenderTargetBitmap 抓不到，
+                2560×1440 导出必须走 glReadPixels / 屏幕捕获；
+             ③ §1.1 仍用 SystemDecorations（Avalonia 12 文档属性为 WindowDecorations，WindowState 已 direct）；
+             ④ 未在 Program.cs 锁定 Win32 渲染后端，Vulkan/Software 下世界层必失败。
+             P1 关键：Launcher.Render「不引 Avalonia」与只许用 GlInterface 冲突；OnOpenGlRender 无 w/h、
+             ctx.IsLost 不可访问；§3.3 物理像素/DIP 混用 + RenderTransformOrigin 默认中心；仿射面板却验收“倾斜 15°”；
+             1s 无帧误判上下文丢失（与失焦停渲染冲突）；GetInstanceAsync 不做目录校验却用于 Broken 判定；
+             相机默认值仍缺；首帧关键路径未定义；Core 失败静默回退 Fake；音频设备失败无兜底；
+             快捷键作用域只覆盖 ESC；取消 A/B 与 README/technoledge 旧分工冲突。
+             下一步：先修 4 项 P0（门渲染层二选一、截图方案、WindowDecorations、后端锁定）再进 S1。
 ```
 
 ## 待办（下一步）

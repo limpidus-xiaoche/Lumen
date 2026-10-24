@@ -1,0 +1,78 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:world="using:Launcher.App.World"
+             x:Class="Launcher.App.Shell.ImmersiveShell">
+  <Grid Background="#0A0612">
+    <world:WorldView x:Name="World" />
+
+    <!-- 降级提示 -->
+    <Border x:Name="DegradedBanner"
+            IsVisible="False"
+            VerticalAlignment="Bottom"
+            HorizontalAlignment="Center"
+            Margin="0,0,0,28"
+            Padding="18,10"
+            CornerRadius="10"
+            Background="#CCF43F5E">
+      <TextBlock x:Name="DegradedText" Foreground="#FFF3EEFF" FontSize="13" />
+    </Border>
+
+    <!-- 顶部导航 -->
+    <Border VerticalAlignment="Top"
+            HorizontalAlignment="Left"
+            Margin="26,22,0,0"
+            Padding="18,14"
+            CornerRadius="14"
+            Background="#B30F0A1C">
+      <StackPanel Spacing="10">
+        <TextBlock Text="LUMEN" FontSize="20" FontWeight="Bold" Foreground="#C084FC" />
+        <ListBox ItemsSource="{Binding Pages}"
+                 SelectedItem="{Binding SelectedPage}"
+                 Background="Transparent"
+                 BorderThickness="0">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding Title}"
+                         Padding="9,5"
+                         FontSize="13"
+                         Foreground="#DCCFFF" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Margin" Value="2" />
+              <Setter Property="Padding" Value="0" />
+              <Setter Property="CornerRadius" Value="8" />
+            </Style>
+            <Style Selector="ListBoxItem:selected">
+              <Setter Property="Background" Value="#593DA8" />
+            </Style>
+            <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+              <Setter Property="Background" Value="#593DA8" />
+            </Style>
+            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+              <Setter Property="Background" Value="#2E1F55" />
+            </Style>
+          </ListBox.Styles>
+        </ListBox>
+      </StackPanel>
+    </Border>
+
+    <!-- 右侧面板（S1 暂为经典页面的浮层） -->
+    <Border HorizontalAlignment="Right"
+            Width="470"
+            Margin="0,22,26,26"
+            Padding="18"
+            CornerRadius="14"
+            Background="#D90A0612"
+            BorderBrush="#338B5CF6"
+            BorderThickness="1">
+      <ContentControl Content="{Binding CurrentPage}" />
+    </Border>
+  </Grid>
+</UserControl>

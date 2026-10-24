@@ -8,6 +8,8 @@ public sealed record NavItem(string Title, object ViewModel);
 
 public partial class MainWindowViewModel : ObservableObject
 {
+    public ILauncherFacade Facade { get; }
+
     public ObservableCollection<NavItem> Pages { get; }
 
     [ObservableProperty]
@@ -18,6 +20,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel(ILauncherFacade facade)
     {
+        Facade = facade;
         Pages =
         [
             new NavItem("首页", new HomeViewModel(facade)),
