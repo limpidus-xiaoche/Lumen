@@ -539,6 +539,7 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
   - **复制导入（默认）**：把所选实例目录复制到 `instances/<id>/`，外部目录不动；适合"先试用"。
   - **原地接管**：`root_path` 直接指向外部目录，不复制；删除实例只解除登记，**永不删外部文件**。UI 必须明确提示"原地模式下本启动器会直接读写该目录"。
 - **删除安全**：`DeleteInstanceAsync(keepSaves)`；`true` 时先把 `saves/`、`screenshots/` 移到 `exports/<instance>-<timestamp>/` 再删实例。
+- **默认语言**：安装与首次启动前检查 `options.txt`，缺失时写入 `lang:zh_cn`；已存在则不覆盖（尊重用户修改）。
 
 ### 6.8 Diagnostics（A）
 
@@ -1020,3 +1021,4 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | M1 前端基础模型（2026-10-24） | §4（前端分工）、§10 M1 | 下载页真实 manifest 列表、设置页 Java 列表；App 接真实 `LauncherFacade`；B 负责优化 |
 | M2（A）（2026-10-24） | §5（SkipAssets）、§6.2（下载）、§6.3（安装）、§10 M2 | DownloadEngine / VanillaInstaller / TaskRegistry / 修复；实测 1.12.2 完整安装 |
 | M3（A）（2026-10-24） | §5（Launch/Stop/Sessions）、§6.5（参数/argfile）、§10 M3 | ArgumentBuilder / JavaVersionPolicy / ArgFileWriter / LaunchService；1.21.1 真实启动通过 |
+| 默认语言（2026-10-24） | §6.7 | `GameOptions` 写入 `lang:zh_cn`；不覆盖已有 options.txt |

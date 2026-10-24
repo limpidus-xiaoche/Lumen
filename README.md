@@ -156,8 +156,9 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | 运行会话 | `sessions` 显示 `pid=83128`；`stop` 后输出"没有运行中的游戏" |
 | 停止 | `stop` 使用 Graceful，游戏打印 `Stopping!`，退出码 **0** |
 | 日志 | stdout/stderr 实时回传；退出归因已接（崩溃报告/退出码） |
-| 测试 | **48 项通过**（Core 43 / App 4 / Integration 1） |
+| 测试 | **50 项通过**（Core 45 / App 4 / Integration 1） |
 | 构建 | 0 警告 / 0 错误 |
+| 默认语言 | 安装/首次启动前写入 `options.txt` `lang:zh_cn`；实机启动并退出后仍为 `zh_cn` |
 | 已知 | 1.21.1 命令行未超 24K，真实 argfile 启动未覆盖；Java 8 超长命令行未实现 wrapper（报 `E5003`） |
 
 > 离线账号的 Realms 认证会报 `Failed to parse into SignedJWT`，属于预期（没有正版 token），不影响本地游戏。
@@ -273,4 +274,8 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              JavaVersionPolicy（版本约束 + 1.13+ 64 位过滤）；ArgFileWriter（ANSI/UTF-8、转义、首行后删除、清扫）；
              LaunchService（进程启动、stdout/stderr、退出归因、RunningSessionStore 持久化）；CLI launch/stop/sessions；
              48 项测试通过；1.21.1 真实启动、会话可见、Graceful 停止 exit 0 已实测。
+
+[2026-10-24] 默认游戏语言：
+             `GameOptions.EnsureDefaultLanguage` 在安装与启动前检查 `options.txt`，缺失时写入 `lang:zh_cn`；
+             已有文件不覆盖（尊重用户改动）；当前实例已修正并在实机启动/退出后验证仍为 zh_cn；测试增至 50 项。
 ```

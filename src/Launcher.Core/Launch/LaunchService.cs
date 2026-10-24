@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Launcher.Core.Auth;
+using Launcher.Core.Game;
 using Launcher.Core.Java;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
@@ -61,6 +62,8 @@ public sealed class LaunchService
         var gameDir = instance.Isolation == IsolationLevel.None
             ? Path.Combine(_paths.SharedDir, "game")
             : Path.Combine(_paths.InstancesDir, instanceId);
+
+        GameOptions.EnsureDefaultLanguage(gameDir);
 
         var versionDir = Path.Combine(_paths.SharedDir, "versions", instance.VersionId);
         var versionJar = Path.Combine(versionDir, $"{instance.VersionId}.jar");

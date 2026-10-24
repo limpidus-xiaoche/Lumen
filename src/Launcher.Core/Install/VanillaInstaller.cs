@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text.Json;
 using Launcher.Core.Download;
+using Launcher.Core.Game;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
 using Launcher.Protocol;
@@ -57,6 +58,8 @@ public sealed class VanillaInstaller
         {
             Directory.CreateDirectory(Path.Combine(gameDir, sub));
         }
+
+        GameOptions.EnsureDefaultLanguage(gameDir);
 
         await _sqlite.UpsertInstanceAsync(
             instanceId, request.DisplayName, gameDir, request.VersionId,
