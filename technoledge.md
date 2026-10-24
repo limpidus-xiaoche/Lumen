@@ -4,7 +4,7 @@
 
 | 项目代号 | **`Lumen`（已确认）** |
 |---|---|
-| 文档版本 | **v0.4** — 决策定稿 + 新一轮 P0/P1/P2 评审回写（数据目录拆分 / argfile 竞态与编码 / 完整性时机 / 契约补口） |
+| 文档版本 | **v0.5** — 复审回写：CmlLib 边界、协作身份、许可存证、编码/源/任务/SSRF 等 |
 | 日期 | 2026-10-24 |
 | 目标平台 | **v1 = Windows 10/11 x64 only**；跨平台列入 v2 非目标 |
 | 开发者 | A：核心（Core / CLI / 打包）　B：应用（Avalonia UI / 交互 / 生态页面） |
@@ -34,7 +34,7 @@
 - 微软 Device Code 登录、authlib-injector 外置登录
 - 实例隔离、外部 `.minecraft` 导入
 - 加载器：Fabric / Forge（三套机制）/ NeoForge
-- 模组启停、整合包导入（CurseForge / Modrinth / HMCL / MultiMC）
+- 模组启停、整合包导入（Modrinth / HMCL / MultiMC；**CF 仅直链包**，见 §6.3.1）
 - 自更新、诊断包导出、设置持久化、历史日志查看
 
 ### 非目标
@@ -45,7 +45,7 @@
 
 ---
 
-## 2. 技术栈与环境（v0.4 修订）
+## 2. 技术栈与环境（v0.5 修订）
 
 | 项 | 选型 | 修订说明 |
 |---|---|---|
@@ -88,7 +88,7 @@ git config --global core.autocrlf false   # 与 .gitattributes 配合，避免�
 
 ---
 
-## 3. 架构与依赖规则（v0.4 修订）
+## 3. 架构与依赖规则（v0.5 修订）
 
 ```
 ┌──────────────── Launcher.App (Avalonia, MVVM) ────────────────┐
@@ -183,6 +183,8 @@ public interface ILauncherFacade
     // ---------- 实例查询 / 任务查询 ----------
     Task<InstanceDetail> GetInstanceAsync(string instanceId, CancellationToken ct);
     Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct);
+    Task CancelTaskAsync(string taskId, CancellationToken ct);
+    Task RetryTaskAsync(string taskId, CancellationToken ct);
 
     // ---------- 安装 / 修复 / 加载器变更 ----------
     Task<InstanceSummary> InstallAsync(InstallRequest request,
@@ -198,6 +200,7 @@ public interface ILauncherFacade
     Task<GameSession> LaunchAsync(string instanceId,
         IProgress<LaunchEvent> events, CancellationToken ct);
     Task StopGameAsync(string instanceId, StopMode mode, CancellationToken ct);
+    Task<IReadOnlyList<RunningSession>> GetRunningSessionsAsync(CancellationToken ct);
 
     // ---------- 账户 ----------
     Task<AccountSummary> LoginAsync(LoginRequest request,
@@ -275,6 +278,60 @@ public sealed record LaunchEvent(LaunchEventKind Kind, string Line,
 
 public sealed record GameSession(string InstanceId, int ProcessId,
     Task<int> ExitTask);         // 进程独立存活，启动器退出不杀游戏
+
+// ---------- 以下为 v0.5 补齐的 DTO：B 的 FakeLauncherFacade 依赖这些字段 ----------
+public sealed record LauncherSnapshot(
+    AppSettings Settings,
+    IReadOnlyList<InstanceSummary> Instances,
+    IReadOnlyList<AccountSummary> Accounts,
+    string? ActiveAccountId,
+    IReadOnlyList<JavaRuntime> Javas,
+    DateTimeOffset? ManifestUpdatedAt,
+    string AppVersion);
+
+public sealed record InstanceSummary(
+    string Id, string Name, string VersionId,
+    LoaderKind Loader, string? LoaderVersion,
+    IsolationLevel Isolation, InstanceState State,
+    string? IconPath, DateTimeOffset? LastPlayedAt);
+
+public sealed record InstanceDetail(
+    InstanceSummary Summary, string GameDir, string? JavaPath,
+    int MemoryMb, string ExtraJvmArgs, int ModCount, long DiskUsageBytes);
+
+public sealed record AccountSummary(
+    string Id, AuthMode Type, string Username, string Uuid,
+    string? AvatarUrl, bool IsActive, DateTimeOffset? ExpiresAt);
+
+public sealed record ModEntry(
+    string Id, string Name, string? Version, string FileName,
+    bool Enabled, LoaderKind Loader,
+    IReadOnlyList<string> Dependencies, string? IconPath);
+
+public sealed record RunningSession(
+    string InstanceId, int ProcessId, DateTimeOffset StartedAt, string? VersionId);
+
+public sealed record ModpackInstallRequest(
+    string FilePath, string? InstanceName, IsolationLevel Isolation, ModpackKind Kind);
+
+public sealed record AppSettingsPatch(
+    int? MaxMemoryMb = null, string? GameDir = null, string? JavaPath = null,
+    ProxyMode? ProxyMode = null, string? ProxyAddress = null,
+    DownloadSourceMode? DownloadSource = null, int? MaxThreads = null,
+    bool? AutoUpdate = null, string? AccentColor = null);
+
+public sealed record LoaderVersionInfo(string Version, bool Stable, DateTimeOffset? ReleasedAt);
+public sealed record JavaRuntime(string Path, int MajorVersion, bool Is64Bit, string Vendor, string? VersionString);
+public sealed record UpdateInfo(string Version, string Notes, long Size, string Sha256, string Url);
+public sealed record LogFileInfo(string Path, string? InstanceId, LogKind Kind, long Size, DateTimeOffset LastWriteAt);
+
+public enum TaskKind { Install, Repair, Modpack, Launch, Update, Import }
+public enum TaskState { Queued, Running, Paused, Succeeded, Failed, Cancelled }
+public enum InstanceState { Installing, Ready, Broken, Repairing }
+public enum ModpackKind { Modrinth, Hmcl, MultiMc, CurseForgeDirect }
+public enum LogKind { Launcher, Game }
+public enum ProxyMode { System, Manual, None }
+public enum DownloadSourceMode { Auto, Official, Mirror }
 ```
 
 **`LaunchAsync` 的 CancellationToken 语义（明确定义）**：只作用于启动前阶段（准备文件、拼装参数、创建进程）。进程 `Started` 之后取消**不会**杀游戏，调用方只能停止订阅事件；要结束游戏必须显式调用 `StopGameAsync`（`Graceful` 先 `CloseMainWindow` 等待 10s，超时或 `Force` 才终止进程树）。
@@ -296,6 +353,7 @@ public sealed record GameSession(string InstanceId, int ProcessId,
 | v0.2 | 2026-10-24 | 门面补齐 9 类能力；`InstallRequest` 支持复用实例；`Percent=-1`；`RefreshManifestAsync` 改枚举；明确 CT 语义 | 评审反馈 |
 | v0.3 | 2026-10-24 | 决策定稿：不签名仅 SHA-256；MIT；GitHub 私有；bangbang93 为发布门禁 | 决策 |
 | v0.4 | 2026-10-24 | 补 `StopGameAsync/GetTasksAsync/GetInstanceAsync/SetActiveAccountAsync`；`LoginRequest` 显式 `AuthMode`；`ImportExternalAsync` 带进度；明确回调线程与节流 | 评审反馈 |
+| v0.5 | 2026-10-24 | 补 `CancelTaskAsync/RetryTaskAsync/GetRunningSessionsAsync`；补齐全部 DTO 字段与枚举；明确 CmlLib 能力边界与 M0 门禁 | 复审反馈 |
 
 ---
 
@@ -307,6 +365,27 @@ public sealed record GameSession(string InstanceId, int ProcessId,
 - `rules` 支持 `os.name / os.arch / os.version / features.*`。
 - **变量断言范围**（修订）：只校验 `library.name / artifact.path / artifact.url` 中不允许残留 `${...}`；`arguments.game/jvm` 与 legacy `minecraftArguments` 中的 `${auth_player_name}` 等**必须放行**，由 §6.5 启动阶段统一校验。
 - 缓存：manifest 15 分钟；version.json 按 SHA1 永久缓存。
+
+### 6.1.1 CmlLib.Core 能力边界（M0 结束前必须定）
+
+原则：**单点集成，禁止双路径并存**。采纳 CmlLib 的模块必须替换我们的实现，不允许"它的下载器 + 我们的下载器"同时存在，否则两套缓存、重试、日志，后期无人敢删。
+
+| 能力 | 结论 | 理由 / 约束 |
+|---|---|---|
+| 下载调度（分片、镜像、`.part.meta`、单 host、磁盘预检） | **必须自研** | CmlLib 自带 Downloader 会绕开 §6.2 全部策略 |
+| 安装 journal / 状态机 / 修复 | **必须自研** | 它不写我们的 journal，M2 验收「中断后可继续/修复」直接落空 |
+| 参数拼装 / `@argfile` / Java 8 wrapper | **必须自研（最多只读参考）** | 必须实测其 `MLauncher` 是否把 `-cp` 拼成单串；若绕过 32K 方案则不可用 |
+| Java 探测与版本约束 | **必须自研** | 需要注册表双视图、32/64 位规则、探测缓存 |
+| 账户存储 / DPAPI / 刷新调度 | **必须自研** | 凭据策略与日志脱敏由我们负责 |
+| 实例隔离 / 外部导入 | **必须自研** | 目录布局与 DB 权威由我们定义 |
+| 版本 JSON 解析 / 继承合并 | **只读参考**，不引依赖 | 需按我们的 rules 与断言范围扩展；模型可借鉴，代码不复制 |
+| NBT / 资源包 / 游戏设置解析、ZIP 安全解压、semver、Maven 路径 | **可复用** | 无状态工具；接入前登记组件表 |
+| 微软 / 外置认证协议原语 | **可复用（仅协议）** | token 存储与刷新调度仍由我们做 |
+
+**M0 门禁（写死）**：
+1. M0 结束前必须给出评估结论（可复用 / 自研 / 不引入）；**未出结论默认全部自研**，M1 不得因此阻塞。
+2. 若引入：验证依赖树**不含 Newtonsoft.Json**、不要求 DI 容器注册、`net10.0-windows` 可编译、且不会触发其 Downloader/installer 路径。
+3. 结论写入 ADR：哪个模块用了它、边界在哪；CLI 与 GUI 必须走同一条实现。
 
 ### 6.2 Download（A）
 
@@ -340,11 +419,21 @@ public sealed record GameSession(string InstanceId, int ProcessId,
 |---|---|---|
 | 1 | Mojang 官方（piston-meta / launchermeta / resources） | 元数据与原始文件；**SHA1 基准** |
 | 2 | BMCLAPI（`bmclapi2.bangbang93.com`） | 国内镜像，按 Mojang 路径映射 |
-| 3 | MCBBS 镜像（`download.mcbbs.net`） | BMCLAPI 不可用时兜底 |
-| 4 | GitHub Releases | 启动器更新包、第三方组件 |
+| 3 | GitHub Releases / 自建镜像（由 `sources.json` 下发） | 更新包、备用镜像 |
 
-- 源列表由 Core 常量 + `mirrors` 表健康度共同决定；设置页的“自动 / 官方 / 镜像”只切换首选集合，**不允许用户填任意 URL**（防投毒与 SSRF）。
+- **源表外置**：`sources.json` 随包内置一份作为 fallback，同时可从 GitHub（HTTPS）拉取更新；换源不必发版。远程列表只允许 https，且每一项都要过下面的 URL 校验。
+- **MCBBS 镜像已关站（2024）**，从默认表移除；仅当 `sources.json` 明确给出且实测可用时才启用。
+- 设置页的“自动 / 官方 / 镜像”只切换首选集合，**不允许用户填任意 URL**（防投毒与 SSRF）。
 - **单文件绑定单 host**：同一文件的所有分片必须来自同一 host；失败换源时整文件重下，不复用不同源的片。否则 SHA1 失败无法归因到具体镜像。
+
+**URL 安全校验（P0，下载层统一执行，整合包清单里的 URL 也必须过）**：
+
+1. 仅允许 `https`；拒绝 `http/file/ftp/data/javascript` 及带 userinfo 的 URL；端口只允许 443（或省略）。
+2. host 白名单：`piston-meta.mojang.com`、`launchermeta.mojang.com`、`resources.download.minecraft.net`、`bmclapi2.bangbang93.com`、`api.modrinth.com`、`cdn.modrinth.com`、`maven.minecraftforge.net`、`maven.neoforged.net`、`github.com`、`objects.githubusercontent.com`、`raw.githubusercontent.com`，以及 `sources.json` 声明的镜像。
+3. **DNS 解析后**校验 IP：拒绝私有网段（10/8、172.16/12、192.168/16）、环回（127/8、::1）、链路本地（169.254/16、fe80::/10）、`0.0.0.0`；防 DNS rebinding。
+4. 重定向最多 3 跳，**每跳重新执行 1–3**；跨 host 重定向默认拒绝。
+5. 整合包清单里的 `downloads[].url` 若无 `sha1/sha512` 且不在白名单 → 拒绝下载（或改为走我们支持的平台 API 解析）。
+6. 代理模式下校验的是最终目标 URL 与解析结果，不是代理地址。
 
 **其它**：
 - `.part` + 原子 rename。
@@ -392,16 +481,17 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
   - 32 位视图必读：1.12.2 时代大量用户只装了 32 位 JRE。
 - 解析优先 `release` 文件的 `JAVA_VERSION`，回退 `java -XshowSettings:properties -version`。
 - 选择以 `version.json` 的 `javaVersion.majorVersion` 为准；兜底：≤1.16.5→8，1.17→16，1.18–1.20.4→17，≥1.20.5→21。
-- **架构约束（新增）**：**1.13+ 必须选 64 位 JRE**；32 位 JRE 只允许用于 ≤1.12.2。探测到 32 位时先过滤掉，否则会出现"选到 32 位 8u → 分配不到内存 → 启动崩溃"的难查问题。v1 只接受 x64（ARM64 不验收）。
-- JRE 下载：Mojang `java-runtime` manifest → `runtimes/`；失败走镜像并校验 SHA1。
+- **架构约束（澄清）**：**启动器本体只支持 x64 Windows**（ARM64 不验收）；**游戏 Java 可为 32 位，但仅允许 ≤1.12.2**。1.13+ 必须先过滤掉 32 位 JRE，否则会出现"选到 32 位 8u → 分配不到内存 → 启动崩溃"的难查问题。
+- **JRE 下载（明确 raw/lzma）**：Mojang `java-runtime` manifest 的 `files` 同时提供 `raw` 与 `lzma`；**v1 只取 `raw`**（§2 只有 `System.IO.Compression`，不支持 LZMA）。若某组件只有 `lzma`，报 `E4003` 并引导换供应商 JRE，**不临时引入 7z 依赖**。下载后按 `sha1` 校验，落 `runtimes/`。
 
 ### 6.5 Launch（A）
 
 - 变量表与三家一致；**未解析变量必须报 `E5002`**，不能把 `${...}` 原样传给游戏。
 - 32K 命令行：Java 9+ 用 `@argfile`；Java 8 回退 wrapper jar（manifest `Class-Path`）。
-- **argfile 编码（写死，P0-3）**：
-  - 编码必须与目标 JVM 一致：启动前用 `java -XshowSettings:properties -version` 读取 `sun.jnu.encoding`，按该编码写 argfile（简体中文 Windows 通常为 GBK/MS936）。
-  - 探测失败时的兜底：JDK ≤17 用 `Encoding.Default`（CP936）；JDK ≥18 用 UTF-8（JEP 400）。
+- **argfile 编码（P0 修正，写死）**：
+  - 编码由目标 JRE 主版本**静态决定**：**JDK ≤17 → 系统 ANSI 代码页**（`CultureInfo.CurrentCulture.TextInfo.ANSICodePage`，中文 Windows 为 936）；**JDK ≥18 → UTF-8**（JEP 400）。
+  - 首次遇到某个 Java 路径时做一次 `sun.jnu.encoding` 探测，结果**缓存到 DB**（`java_path → encoding`）；之后启动不再起进程。
+  - **`.NET Core` 的 `Encoding.Default` 恒为 UTF-8，禁止使用**；必须注册 `CodePagesEncodingProvider.Instance` 并 `Encoding.GetEncoding(ansiCodePage)`（依赖 `System.Text.Encoding.CodePages`）。
   - **禁止无条件 UTF-8**：含中文的实例/资源路径会变乱码，表现为 `Could not find or load main class`。
 - **argfile 转义**：一行一个参数；参数含空格、制表、引号或 `#` 时用双引号包裹，并转义 `\` 与 `"`；不依赖 shell 引号规则。
 - **argfile 生命周期（修订，P0-2）**：
@@ -425,6 +515,7 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 - 离线：`UUIDv3(md5("OfflinePlayer:"+name))`；token 生成合法 JWT 形状。
 - 微软：Device Code → live token → XBL → XSTS → Minecraft；token 加密存储、自动刷新。
 - 外置：authlib-injector **运行期下载并校验 SHA1**（不随包分发，见 §12），`-javaagent:...=地址`。
+  - **SHA1 基准来源**：内置「版本 → SHA1」pin 表（随应用发布更新），只接受表内版本；表外版本一律拒绝（`E6003`）。禁止信任远端返回的 hash。
 - **脱敏名单（修订）**：`--accessToken`、`clientId`、`refresh_token`、`client secret`、外置登录密码、session token、代理密码、`xuid`。
 
 ### 6.7 Instances（A）
@@ -438,7 +529,9 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 | `Full` | `instances/<id>/` | 上述 + `options.txt screenshots/` | 同上（**禁止复制 libraries/assets**，否则磁盘爆炸） |
 
 - **natives 归属（修订）**：`shared/natives/<versionId>/<arch>-<hash>/`，按 **version + arch 唯一**，绝不实例内共享；解压时加文件锁，避免并行启动不同版本互相覆盖。
-- 外部目录：PCL / HMCL / MultiMC / 原生 `.minecraft` 只读识别，用户确认后导入。
+- 外部目录：PCL / HMCL / MultiMC / 原生 `.minecraft` 只读识别。导入二选一：
+  - **复制导入（默认）**：把所选实例目录复制到 `instances/<id>/`，外部目录不动；适合"先试用"。
+  - **原地接管**：`root_path` 直接指向外部目录，不复制；删除实例只解除登记，**永不删外部文件**。UI 必须明确提示"原地模式下本启动器会直接读写该目录"。
 - **删除安全**：`DeleteInstanceAsync(keepSaves)`；`true` 时先把 `saves/`、`screenshots/` 移到 `exports/<instance>-<timestamp>/` 再删实例。
 
 ### 6.8 Diagnostics（A）
@@ -463,7 +556,7 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 
 ---
 
-## 7. 数据与文件布局（v0.4 修订）
+## 7. 数据与文件布局（v0.5 修订）
 
 **目录拆分（P0-1）**：`%APPDATA%`（Roaming）在 AD 域/漫游配置环境会整包同步，数 GB 的 versions/libraries/assets 绝不能放进去；只有小配置放 Roaming。
 
@@ -486,6 +579,16 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 - **instance.json 与 DB 的权威关系（明确）**：**DB 是唯一权威**；`instance.json` 只作只读导出与排障快照。UI/CLI 一律写 DB；检测到 json 被手工修改时不自动合并，提示"导入/覆盖"二选一。
 - **便携模式**：`--portable` → exe 同级 `data\`；启动时先做可写探测（Program Files 下不可写则回退 `%LOCALAPPDATA%` 并提示，不静默失败）。
 - **备份**：WAL 下直接复制 `launcher.db` 会得到不一致快照；备份前必须 `PRAGMA wal_checkpoint(TRUNCATE)`，或用 `VACUUM INTO 'backup.db'`。
+
+### 7.1 路径安全与垃圾回收
+
+- **路径校验（所有生成路径统一走 `PathGuard`）**：
+  - 实例名/内部 ID 只允许 `[A-Za-z0-9._-]`，长度 ≤ 64；拒绝 Windows 保留名（CON/PRN/AUX/NUL/COM1..9/LPT1..9）与结尾点/空格。
+  - 拼接后必须 `GetFullPath` 且仍位于对应根目录内；拒绝 `..`、绝对路径注入、UNC 与设备路径（`\\?\`）。
+  - 解压前校验每个 entry 的目标路径（Zip Slip）；拒绝符号链接/junction 逃逸。
+  - 外部目录允许在任意盘，但必须显式确认，且只读写其 `.minecraft` 结构。
+- **blobs 垃圾回收**：空闲时执行 mark-and-sweep——以 `url_cache`、当前实例、下载队列为根标记；未被引用且 `verified_at` 超过 30 天的 blob 删除。安装/修复运行期间禁止 GC；每轮写日志（删除数量/释放字节）。
+- `download_queue` 中 `state=done/failed` 且超过 7 天的行一并清理。
 
 ### Schema v3（含迁移）
 
@@ -568,12 +671,14 @@ CREATE TABLE install_journal(
 | `E3003` | `err.install.interrupted` | 安装中断（有 journal） | 提供"继续/修复" |
 | `E4001` | `err.java.not_found` | 未找到合适 Java | 引导下载 JRE |
 | `E4002` | `err.java.memory_out_of_range` | 内存参数越界 | 回落到合法范围 |
+| `E4003` | `err.java.runtime_lzma_only` | java-runtime 仅提供 lzma | 引导换供应商 JRE |
 | `E5001` | `err.launch.java_version` | Java 版本不匹配 | 建议切换 Java |
 | `E5002` | `err.launch.unresolved_placeholder` | 参数变量未解析 | 报告版本 JSON 异常 |
 | `E5003` | `err.launch.command_too_long`（**内部**，不展示） | 命令行超长 | 自动走 argfile/wrapper |
 | `E5004` | `err.launch.crashed` | 游戏异常退出 | 关联崩溃报告归因 |
 | `E6001` | `err.auth.microsoft_failed` | 微软登录失败 | 重试/检查网络 |
 | `E6002` | `err.auth.token_invalid` | token 失效（含换机解密失败） | 重新登录 |
+| `E6003` | `err.auth.authlib_version_untrusted` | 外置组件版本不在 pin 表 | 拒绝下载 |
 | `E7001` | `err.instance.broken` | 实例损坏 | 提供修复 |
 | `E8001` | `err.update.hash_mismatch` | 更新清单/更新包哈希校验失败 | 拒绝更新，保留当前版本 |
 | `E8002` | `err.integrity.self_check_failed` | 自身文件完整性校验失败 | 拒绝自我替换，引导重新安装 |
@@ -584,11 +689,12 @@ CREATE TABLE install_journal(
 
 ### 9.0 仓库与权限（已确认）
 
-- 托管：**GitHub 私有仓库** `limpidus-xiaoche/Lumen`（已实测**可读可写**；`main` 已推送首个提交）。
-- 认证：两位开发者各用自己的 **SSH 公钥（ed25519）**；当前密钥以 **Deploy key** 方式绑定到该仓库（`ssh -T` 返回 `Hi limpidus-xiaoche/Lumen!`），**已验证具备写权限**，但权限仅限此仓库，不能创建仓库或访问其他仓库。仓库内**不得**存放任何私钥/令牌。
-- `main` 分支保护：禁止直接 push、禁止 force push；所有改动走 PR，需**对方 1 个 approve**。
-- `CODEOWNERS`：`src/Launcher.Core/**`、`src/Launcher.Cli/**`、`tests/Launcher.Core.Tests/**`、`tests/Launcher.Integration.Tests/Core/**` → A；`src/Launcher.App/**`、`tests/Launcher.App.Tests/**`、`tests/Launcher.Integration.Tests/App/**` → B；`Launcher.Protocol/**` 与根目录文档 → 双方。
-- **账号等级（已确认：Free）**：私有仓 rulesets / CODEOWNERS 强制 review 不可用。执行降级方案：`main` 保护改为团队约定 + pre-push hook（拒绝直接推 main）+ PR 模板 + CI 必绿；`CODEOWNERS` 仍保留，作为 review 路由而非强制门禁。
+- 托管：**GitHub 私有仓库** `limpidus-xiaoche/Lumen`（已推送首个提交）。
+- **身份模型（修正）**：两位开发者由 owner 加为 **collaborators**，各自使用自己的**用户级 SSH key**；提交邮箱必须与各自 GitHub 账号邮箱一致，否则提交/PR 无法归属。
+- **Deploy key 只给 CI，且只读**：当前这把 deploy key 带写权限，**M0 前由 owner 移除或降权**；不得用它代替个人身份推送。
+- **分支策略（务实版）**：Free 计划无法启用 rulesets / 强制 review，所以**不存在"已生效的 main 保护"**。执行方式：团队约定 + `.githooks/pre-push`（拒绝直接推 main）+ CI 检测直推并报警；force push 仅作约定禁止。
+- **Hook 安装（必需步骤）**：仓库内提交 `.githooks/pre-push`；每人执行 `git config core.hooksPath .githooks`。hooks 不随 clone 自动生效，M0 验收必须检查。
+- `CODEOWNERS` 仅作 review 路由（Free 计划不强制）。
 - CI：GitHub Actions `windows-latest`，跑 format/build/test；PR 必须全绿才能合并。
 - 仓库不存 secrets；发布凭据（若有）只放 GitHub Environments，并开启人工审批。
 
@@ -603,7 +709,7 @@ CREATE TABLE install_journal(
 ```
 feat(core/download): 支持 Range 分片与镜像失败分类
 fix(core/launch): argfile 首行输出后再删除（共享冲突重试）
-docs: 契约 v0.4
+docs: 契约 v0.5
 ```
 
 ### 9.3 冲突预防
@@ -612,7 +718,7 @@ docs: 契约 v0.4
 2. 共享文件改前打招呼（§4 清单）。
 3. DTO 一个 record 一个文件，减少同文件冲突。
 4. 每天开工 `git pull --rebase`；收工前推 WIP 分支（标题 `[WIP]`）。
-5. 不提交 `_probe/`、`bin/`、`obj/`、日志、`.vs/`。
+5. 不提交 `_probe/`、`bin/`、`obj/`、日志、`.vs/`；`_probe/` 仅本地取证，**未来开源时源码树也不得包含任何 PCL 内容**。
 
 ### 9.4 PR 检查单
 
@@ -624,18 +730,20 @@ docs: 契约 v0.4
 
 ---
 
-## 10. 任务拆解与里程碑（v0.4 修订）
+## 10. 任务拆解与里程碑（v0.5 修订）
 
 > 无时间估算，只排顺序与验收。`[A]`=核心，`[B]`=应用，`[AB]`=共同。
 
 ### M0 骨架 + 离线身份（修订：离线认证前移）
 
 - `[A]` 解决方案、`global.json`/`Directory.*`/`.editorconfig`/`NuGet.config`/`dotnet-tools.json`
-- `[A]` `LauncherPaths`、`AppSettings`、日志、SQLite v2 + 迁移、原子写、单实例互斥、全局异常兜底
+- `[A]` `LauncherPaths`、`AppSettings`、日志、**SQLite v3 + 迁移**、原子写、单实例互斥、全局异常兜底
 - `[A]` 离线账户（UUIDv3 + 伪 JWT）——约 20 行，不单独占里程碑
+- `[A]` `LICENSE`、`THIRD_PARTY_NOTICES.md`、`docs/legal/` 许可存证
 - `[B]` Avalonia 壳 + 导航 + 六个空页 + 主题基线 + `FakeLauncherFacade`
-- `[AB]` 冻结 §5 契约 v0.2
-- **验收**：两人 build 绿；六页可切换；架构测试通过；离线身份可生成。
+- `[AB]` 冻结 §5 契约 **v0.5**；提交 `.githooks/pre-push`，每人执行 `git config core.hooksPath .githooks`
+- `[A]` 产出 **CmlLib.Core 评估结论**（§6.1.1 门禁；无结论则默认自研）
+- **验收**：两人 build 绿；六页可切换；架构测试通过；离线身份可生成；hook 生效（直推 main 被本地拒绝）。
 
 ### M1 元数据 + Java
 
@@ -645,13 +753,13 @@ docs: 契约 v0.4
 
 ### M2 原版安装
 
-- `[A]` 下载引擎（阈值分片/顺序哈希/失败分类/续传 meta/持久队列/磁盘预检）+ Vanilla 安装 + journal + 修复
-- `[B]` 任务中心、进度 UI、取消/重试、启动时恢复任务
+- `[A]` 下载引擎（阈值分片/顺序哈希/失败分类/续传 meta/持久队列/磁盘预检/URL 安全校验）+ Vanilla 安装 + journal + 修复
+- `[B]` 任务中心、进度 UI、**`CancelTaskAsync`/`RetryTaskAsync`**、启动时恢复任务
 - **验收**：装 1.21.x SHA1 全通过；断网续传；重复安装秒完成；中断后可"继续/修复"。
 
 ### M3 启动原版（离线）
 
-- `[A]` `ArgumentBuilder`、`ArgFileWriter`（生命周期）、`ProcessRunner`、退出归因
+- `[A]` `ArgumentBuilder`、`ArgFileWriter`（生命周期与编码）、`ProcessRunner`、**`GetRunningSessionsAsync` + 孤儿进程识别**、退出归因
 - `[B]` 实例卡片、启动按钮、实时日志、历史日志列表
 - **验收**：离线实例进游戏；含空格/中文/引号路径可用；异常退出给出 `E5xxx` 归因。
 
@@ -687,7 +795,7 @@ docs: 契约 v0.4
 
 ---
 
-## 11. 测试与 CI（v0.4 修订）
+## 11. 测试与 CI（v0.5 修订）
 
 - **单元（A）**：rules 20+ 组合；继承合并（Fabric/Forge 真实 JSON）；参数拼装（1.12 字符串 vs 1.21 数组）；**argfile 转义（空格/中文/引号）**；UUIDv3；Zip Slip；原子写；SHA1 顺序校验；失败分类。
 - **UI（B）**：VM 状态迁移、Mock 进度（含 `Percent=-1`）、任务取消。
@@ -696,19 +804,30 @@ docs: 契约 v0.4
 - **序列化（A/B）**：`System.Text.Json` 源生成必须显式注册全部 Protocol 类型；用反射遍历测试，漏注册即失败（否则只在运行时炸）。
 - **压力/节流**：3000 个 asset 的安装，进度回调 ≤10 次/秒且首末帧必发。
 - **篡改/完整性（A）**：改 1 字节更新包 / 本地文件 → 必须 fail-closed 并给 `E8001/E8002`；清单 `size` 与包不符、`sha256` 不符、缺失哈希 → 全部拒绝；不做签名与公钥轮换用例。
-- **真机矩阵**：Java **8(32-bit) / 8(64-bit) / 16 / 17 / 21** × {Vanilla 1.21, Fabric, Forge 1.12.2, Forge 1.16.5, Forge 1.20.1, NeoForge 1.21}；1.13+ 必须过滤 32 位；**退出码矩阵**按无符号比较（`0xC0000005` → `unchecked((int)0xC0000005)`，否则永不为真）。
+- **真机矩阵（按合法性约束，不做笛卡尔积）**：
+  - `Java 8 32-bit` × `Forge 1.12.2`（唯一合法 32 位组合）
+  - `Java 8 64-bit` × `Vanilla 1.12.2 / Forge 1.12.2 / Forge 1.16.5`
+  - `Java 16` × `1.17 Fabric / Forge`
+  - `Java 17` × `Forge 1.16.5 / Forge 1.20.1 / Fabric 1.20.4`
+  - `Java 21` × `Vanilla 1.21 / Fabric 1.21 / NeoForge 1.21`
+  - **非法组合不测**：`Java 8` × `1.18+`、`32-bit` × `1.13+`
+  - **退出码矩阵**按无符号比较（`0xC0000005` → `unchecked((int)0xC0000005)`，否则永不为真）。
+- **安全/边界（A）**：URL 校验（file:/localhost/私网/跨 host 重定向）、`sources.json` 远端不可用回退内置、java-runtime 仅 lzma 时报 `E4003`、CodePages 编码、任务取消/重试、`GetRunningSessionsAsync` 重启后识别游戏进程。
 - **CI**：`dotnet format --verify-no-changes` → `build -warnaserror` → `test` →（tag）`publish`。
 
 ---
 
-## 12. 发布、版本与合规（v0.4 修订）
+## 12. 发布、版本与合规（v0.5 修订）
 
 - 分发：**只用 Velopack**，产物 `Setup.exe`、`*-delta.nupkg`、`Portable.zip`；**不产 MSI**。
 - 代码签名：**v1 不做**（Authenticode 与应用层签名都不做）；发布说明明示未签名，首次启动给 SmartScreen 引导。
 - 许可证：本项目采用 **MIT**（根目录 `LICENSE`，版权行格式 `Copyright (c) 2026 <作者/组织>`，落 M0 前填写）；所有随包第三方组件必须与 MIT 兼容，不兼容者只能运行期下载/调用，并登记到 `THIRD_PARTY_NOTICES.md`。
+- **发布形态（定稿）**：`self-contained=true`、`PublishSingleFile=false`、`PublishTrimmed=false`、`ReadyToRun=true`。
+  - 理由：不要求用户装 .NET；Velopack 对**目录型产物**做 delta 最稳；单文件会破坏 delta 与首次启动解压；裁剪对 Avalonia 反射不友好，风险大于收益。
+  - 1.5s 冷启动预算按 R2R + 目录形态评估；超出时先查 manifest/DB/完整性快校验，不要改发布形态。
 - 版本号 `主.次.修订`；tag `v0.x.y`；CHANGELOG 由 PR 标题汇总。
 - **Minecraft EULA 立场**：不分发 client jar / assets / 原版文件，全部从 Mojang 官方或镜像下载；离线模式仅限用户本地自用，不提供任何绕过正版验证的机制。
-- **PCL2 代码复用边界**：不 fork、不复制其代码/资源/帮助文本。其许可证为《PCL 分发有限许可》+《存储库合理使用指南》；「重度使用」（基于仓库修改，或参考大量内容重新实现启动/下载/Mod 管理等实质功能）要求：名称必须以 `Plain Craft Launcher (PCL)` 开头、关于页首位署名龙腾猫跃并附赞助链接、公开源码并沿用该指南、实现正版/赞助劝导、Windows 主色相必须为蓝色。以上与 MIT + `Lumen` + 自有 UI 不兼容，因此只借鉴**不受版权保护的交互思想与公开协议**。
+- **PCL2 代码复用边界（可核验）**：不 fork、不复制其代码/资源/帮助文本。依据原文：`https://github.com/Meloong-Git/PCL/blob/main/LICENCE`（抓取日期 2026-10-24），本地存档 `docs/legal/pcl-license-2026-10-24.txt`。重度使用（基于仓库修改，或参考大量内容重新实现启动/下载/Mod 管理等实质功能）要求：名称必须以 `Plain Craft Launcher (PCL)` 开头、关于页首位署名龙腾猫跃并附赞助链接、公开源码并沿用该指南、实现正版/赞助劝导、Windows 主色相必须为蓝色。以上与 MIT + `Lumen` + 自有 UI 不兼容，因此只借鉴不受版权保护的交互思想与公开协议。**本仓库源码树（含未来开源版本）不含任何 PCL 内容**；`_probe/` 仅本地取证，永不入库、也不作为交付物。
 - **可复用库**：`CmlLib.Core`（MIT）可作为元数据/下载/启动原语的候选实现，接入方式由 `Launcher.Core` 的接口决定；引入前需复核其 LICENSE 与维护状态。
 - **第三方组件（新增：能下载就不打包）**
 
@@ -724,6 +843,7 @@ docs: 契约 v0.4
 | Velopack | MIT | 是 | 更新/安装器 |
 | Serilog（含 `Sinks.File`） | Apache-2.0 | 是 | 文件日志 |
 | System.CommandLine | MIT | 是 | CLI 解析 |
+| System.Text.Encoding.CodePages | MIT | 是 | argfile ANSI 代码页（§6.5） |
 | NetArchTest.Rules | MIT（待复核） | 否 | 仅测试 |
 | CmlLib.Core | MIT（已复核） | 待定（优先评估） | M1 前评估；若引入仅作元数据/下载/启动原语 |
 
@@ -747,6 +867,7 @@ docs: 契约 v0.4
 4. 自身完整性清单**排除**用户配置、日志、`accounts.json`、下载缓存；只覆盖随包发布的二进制与资源。
 5. 首次启动与更新页给"Windows 已保护你的电脑 → 更多信息 → 仍要运行"的图文引导；不在程序里自动改 Defender 排除项。
 6. **校验时机（P0-4）**：冷启动只校验 `Launcher.exe` 与清单本身，并按「程序版本 + 文件 mtime」缓存结果；全量哈希只在更新后首次启动或用户手动触发时执行，避免与 1.5s 启动预算冲突。
+7. **`integrity.json` 由 CI 生成（禁止手工）**：发布流水线在 `publish` 后对产物目录计算 SHA-256、生成清单并打进包；delta 包使用同一清单版本；workflow 必须校验「清单 ↔ 产物」一致，不一致直接失败。
 
 **安全边界（必须如实写进发布说明）**：
 
@@ -781,6 +902,9 @@ docs: 契约 v0.4
 | 18 | 是否 fork PCL2 | **不 fork，也不复制其代码/资源** | 许可证为《PCL 分发有限许可》+ 合理使用指南；重度使用要求「PCL 开头命名 + 关于页署名 + 公开源码并沿用指南 + 正版/赞助劝导 + Windows 主色相蓝色」，与 MIT/Lumen 直接冲突 |
 | 19 | 避免重复造轮子 | M1 前评估 **CmlLib.Core（MIT）** 覆盖元数据/下载/启动原语；接口不变 | 不引入 PCL 代码；评估结论在 M1 前落文档 |
 | 20 | 是否 fork XMCL | **否决**（保持路线 C） | XMCL 为 MIT、Electron/TypeScript，功能完整；但与 .NET/Avalonia 栈不兼容，切换需整体转 Node。仅作 UX 参考，不复制代码 |
+| 21 | CmlLib 复用边界 | 只复用无状态工具；下载/安装/启动/Java/账户/实例自研；M0 出结论 | 未出结论默认自研；**禁止双路径并存** |
+| 22 | 协作身份 | 开发者用 collaborators + 用户级 SSH；deploy key 仅 CI 只读 | Free 计划无强制保护，靠 hook + CI |
+| 23 | 发布形态 | self-contained + R2R + 非单文件/非裁剪 | Velopack delta 对目录型产物最稳 |
 
 ---
 
@@ -871,3 +995,12 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | v0.4 版本记账 | 头部、§2/§3/§5/§7/§10/§11/§15/§17 标题、§5 契约表 |
 | 补充：PCL2 许可核实 | §2（复用库）、§12（PCL2 边界 + 组件表）、§13-18/19 | 结论：不 fork；评估 CmlLib.Core（MIT） |
 | 补充：XMCL 评估 | §2（复用库）、§12（组件表）、§13-20 | 结论：MIT 可 fork，但决定不切换；维持 .NET + CmlLib.Core |
+| v0.5 P0-1 CmlLib 边界 | §6.1.1（能力表 + M0 门禁）、§2、§12、§13-21 |
+| v0.5 P0-2 协作身份 | §9.0（collaborators / deploy key / 约定）、§10 M0、§13-22 |
+| v0.5 P0-3 许可存证 | §12（原文链接 + 抓取日期 + 本地存档 + 源码树不含 PCL）、`docs/legal/` |
+| v0.5 P0-4 编码兜底 | §6.5（CodePages + 静态决定 + 缓存）、§8.2、§12 组件表 |
+| v0.5 P0-5 源表 / MCBBS | §6.2（移除 MCBBS、`sources.json` 外置） |
+| v0.5 P0-6 任务取消/重试 | §5（`CancelTaskAsync/RetryTaskAsync`）、§10 M2 |
+| v0.5 P0-7 下载 URL 安全 | §6.2（https/白名单/私网/重定向/无 hash 拒绝）、§11 |
+| v0.5 P0-8 lzma | §6.4（只取 raw / `E4003`）、§8.2 |
+| v0.5 P1 其余 | §5 DTO 字段、§5 `GetRunningSessionsAsync`、§9.0 hook 安装、§6.6 authlib pin、§12 发布形态、§12.1 CI 生成、§6.7 导入模式、§7.1 路径/GC、§10 M0 版本、§1 范围、§6.4 x64、§11 矩阵 |

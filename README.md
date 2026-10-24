@@ -1,6 +1,6 @@
 # MC 启动器原理调研（本地取证）
 
-> 本文件按用户规则实时记录进度。所有结论均来自本机文件静态分析，未使用网络资料。
+> 本文件按用户规则实时记录进度。原理结论主要来自本机静态分析；PCL2/XMCL 许可证与仓库信息来自官方链接（原文已存档 `docs/legal/`）。
 
 ## 进度
 
@@ -23,7 +23,31 @@
 - [x] XMCL 评估（MIT，可 fork）：**放弃**；维持路线 C（.NET 10 + Avalonia + CmlLib.Core），XMCL 仅作 UX 参考
 - [x] `technoledge.md` **v0.3 复审**（2026-10-24）：新增 P0 5 项 / P1 16 项 / P2 11 项，见下「v0.3 复审记录」
 - [x] `technoledge.md` 升版 **v0.4** 完成：P0-1..P0-5 全部落位（CF=C、GitHub=Free）
+- [x] `technoledge.md` **v0.4 复审（两轮）**：第 1 轮 6 个 P0 + 第 2 轮 3 个新增 P0，见下「v0.4 复审记录」
+- [x] `technoledge.md` 升版 **v0.5**：P0/P1 全部回写（CmlLib 边界、协作身份、许可存证、编码/源/任务/SSRF/lzma、DTO、孤儿进程、hook、发布形态、路径/GC）
+- [ ] 仓库协作收尾：owner 把两人加为 collaborators；**移除/降权当前 deploy key 的写权限**（改为 CI 只读）
 - [ ] M0：解决方案骨架（**用户要求暂不搭建**）
+
+## v0.4 复审记录（已回写 v0.5，保留追溯）
+
+> 处理结果见 `technoledge.md` §17 的 v0.5 各行与 §13-21/22/23。
+
+第 1 轮（已回写 v0.5）：
+
+1. §6.5 L404 兜底「JDK ≤17 用 `Encoding.Default`（CP936）」在 .NET 5+ 不成立（`Encoding.Default` 恒为 UTF-8）→ 需 `CodePagesEncodingProvider` + `GetEncoding(ANSICodePage)`，并加包 `System.Text.Encoding.CodePages`
+2. §6.5 L402 为读 `sun.jnu.encoding` 每次启动多起一个 JVM（100–300ms）→ 改按 JRE 大版本静态决定 + 按 java 路径缓存
+3. §6.2 L343 `download.mcbbs.net`：MCBBS 已于 2024 年关站，需实测；源表应改为可下发的 `sources.json` 而非 Core 常量
+4. §5 缺 `CancelTaskAsync(taskId)` / `RetryTaskAsync(taskId)`：`GetTasksAsync` 恢复的任务无 CT 持有者，实际无法取消
+5. 整合包清单里的下载 URL 无约束 → SSRF/任意拉取；需仅 https + host 白名单 + 禁 localhost/`file:`
+6. §6.4 L396 JRE 的 `lzma` 变体未提：System.IO.Compression 不支持 LZMA → 明确只取 `raw` 或引入 7z（含许可证）
+
+第 2 轮（本轮新增内容：CmlLib.Core / PCL2 许可边界 / XMCL 否决 / 真实仓库）：
+
+7. **CmlLib.Core 与自研内核的能力边界未定**：它自带下载/安装/启动/Java 逻辑，直接复用会绕过 §6.2 的 `.part.meta`、镜像健康度与 §6.3 的 install journal（M2「中断可继续」失效），也可能自行拼命令行（M3 argfile/wrapper 失效）→ 需能力边界表：只复用元数据解析与 natives/asset 提取；下载、参数拼装、进程管理必须留在 `Launcher.Core`
+8. **Deploy key 无法支撑双人 PR 流程**：deploy key 是仓库级凭据，无法代表两个 GitHub 用户 → PR 作者/approve/CODEOWNERS 全部失义；Free 计划无分支保护 + 写权限 key = 可直推/强推 `main` → 改用两个协作者账号
+9. **PCL2 许可证结论是转述**：§12 的「名称 PCL 开头 / 蓝色主色相 / 关于页署名」属法律判断，需附许可原文链接 + 存档日期 + 本地副本，否则不可核验
+
+第 1 轮 P1（未回写）：DTO 字段全缺（`LauncherSnapshot/InstanceSummary/InstanceDetail/AccountSummary/ModEntry/ModPackInstallRequest/AppSettingsPatch`）；`StopGameAsync(instanceId)` 无法处理孤儿进程（缺 `GetRunningSessionsAsync`）；§9.0 pre-push hook 无安装步骤（§15 缺 `core.hooksPath`）；authlib-injector SHA1 无基准（需内置 pin 表）；`integrity.json` 未写 CI 构建时生成；发布形态（self-contained/R2R/单文件/裁剪）未定；外部导入「复制 vs 原地接管」未定；路径安全校验缺失；`blobs` 无 GC；§10 M0 仍写「SQLite v2 / 契约 v0.2」；§1 仍列 CurseForge；§6.4「v1 只接受 x64」措辞冲突；§11 矩阵含非法组合。
 
 ## v0.3 复审记录（已回写 v0.4，保留追溯）
 
@@ -90,7 +114,7 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 - 签名现状（2026-10-24 用 `Get-AuthenticodeSignature` 复核）：三个样本 exe 全部 `NotSigned`；HMCL 另有**应用层**更新签名公钥 `assets/hmcl_signature_publickey.der`，PCL2 内置「Microsoft Defender 添加排除项」帮助文档——即行业普遍用"运行时引导 + 自身更新校验"替代 Authenticode。
 - PCL2 许可证（2026-10-24 核实 `Meloong-Git/PCL`）：**不是 MIT/Apache**，而是《PCL 分发有限许可》+《存储库合理使用指南》。"重度使用"（基于仓库修改，或参考大量内容重制启动/下载/Mod 管理等实质功能）要求：名称以 `Plain Craft Launcher (PCL)` 开头、关于页首位署名并附赞助链接、公开源码并沿用其指南、实现正版/赞助劝导、Windows 主色相必须为蓝色。**与本项目 MIT + `Lumen` 不兼容，结论：不 fork**。
 
-## 取证产物
+## 取证产物（仅本地，**不入库、不作为交付物**）
 
 - `_probe/*.py`：PE / 字符串 / asar / zip 解析脚本
 - `_probe/versepc/`：VersePC 主进程、后端、预加载、插件清单、AI 配置等抽取文件
@@ -139,4 +163,11 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              其 @xmcl/core、installer、user、curseforge、modrinth、file-transfer 等包覆盖启动器核心；
              但与 Lumen 的 .NET/Avalonia 栈不兼容——直接复用需整体转 Node/Electron，或增加 Node sidecar。
              结论（已拍板）：**放弃 fork XMCL，维持路线 C**（.NET + CmlLib.Core）；XMCL 仅作 UX 参考。
+
+[2026-10-24] technoledge v0.5 回写完成：
+             CmlLib 能力边界表 + M0 门禁；协作身份改 collaborators + 用户级 SSH（deploy key 仅 CI 只读）；
+             PCL2 许可原文存档 docs/legal/；argfile 改 CodePages + 静态决定 + 缓存；
+             移除 MCBBS、源表改 sources.json；补 Cancel/Retry/GetRunningSessions 与全部 DTO；
+             下载 URL 白名单/私网拒绝；java-runtime 只取 raw；发布形态/R2R、integrity CI 生成、路径校验与 blobs GC。
+             仓库协作收尾待 owner 操作（加 collaborators、降权 deploy key）。
 ```
