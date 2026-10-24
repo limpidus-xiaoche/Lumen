@@ -4,7 +4,7 @@
   <ScrollViewer>
     <StackPanel Margin="28" Spacing="12" MaxWidth="520" HorizontalAlignment="Left">
       <TextBlock Text="设置" FontSize="26" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
-      <TextBlock Text="外观与启动偏好（M0 阶段部分项为占位）" FontSize="12" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,8" />
+      <TextBlock Text="外观与启动偏好（M1 起接入真实门面）" FontSize="12" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,8" />
 
       <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
         <StackPanel Spacing="8">
@@ -23,6 +23,31 @@
             <TextBox Text="{Binding MaxMemoryMb}" Width="120" />
             <Button Content="保存设置" Command="{Binding SaveCommand}" />
           </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Java 运行时" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="刷新 Java 列表" Command="{Binding LoadJavasCommand}" />
+            <TextBlock Text="{Binding JavaStatusText}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondary}" FontSize="12" />
+          </StackPanel>
+          <ScrollViewer Height="220">
+            <ItemsControl ItemsSource="{Binding Javas}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Padding="10" Margin="0,3" Background="{DynamicResource ContentBackground}" CornerRadius="6"
+                          BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="{Binding Path}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource TextPrimary}" />
+                      <TextBlock Text="{Binding Vendor}" Foreground="{DynamicResource TextMuted}" FontSize="11" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
         </StackPanel>
       </Border>
 

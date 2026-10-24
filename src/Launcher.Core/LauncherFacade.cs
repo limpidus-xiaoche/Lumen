@@ -1,5 +1,9 @@
 using System.IO.Compression;
 using Launcher.Core.Auth;
+using Launcher.Core.Install;
+using Launcher.Core.Java;
+using Launcher.Core.Launch;
+using Launcher.Core.Meta;
 using Launcher.Core.Storage;
 using Launcher.Protocol;
 using Microsoft.Extensions.Logging;
@@ -12,37 +16,58 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly AppSettingsStore _settingsStore;
     private readonly SqliteStore _sqlite;
     private readonly ILogger<LauncherFacade> _logger;
+    private readonly ManifestClient? _manifestClient;
+    private readonly JavaLocator? _javaLocator;
+    private readonly VanillaInstaller? _installer;
+    private readonly LaunchService? _launcher;
+    private readonly TaskRegistry _tasks;
 
     public LauncherFacade(
         LauncherPaths paths,
         AppSettingsStore settingsStore,
         SqliteStore sqlite,
-        ILogger<LauncherFacade> logger)
+        ILogger<LauncherFacade> logger,
+        ManifestClient? manifestClient = null,
+        JavaLocator? javaLocator = null,
+        VanillaInstaller? installer = null,
+        TaskRegistry? tasks = null,
+        LaunchService? launcher = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
         _sqlite = sqlite;
         _logger = logger;
+        _manifestClient = manifestClient;
+        _javaLocator = javaLocator;
+        _installer = installer;
+        _tasks = tasks ?? new TaskRegistry();
+        _launcher = launcher;
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
     {
         var settings = _settingsStore.Load();
         var instances = await _sqlite.GetInstancesAsync(ct);
+        var javas = _javaLocator?.Detect() ?? Array.Empty<JavaRuntime>();
         return new LauncherSnapshot(
             settings,
             instances,
             Array.Empty<AccountSummary>(),
             ActiveAccountId: null,
-            Array.Empty<JavaRuntime>(),
+            javas,
             ManifestUpdatedAt: null,
             AppVersion: typeof(LauncherFacade).Assembly.GetName().Version?.ToString() ?? "0.0.0");
     }
 
-    public Task<VersionManifest> RefreshManifestAsync(ManifestRefreshMode mode, CancellationToken ct)
+    public async Task<VersionManifest> RefreshManifestAsync(ManifestRefreshMode mode, CancellationToken ct)
     {
-        _logger.LogInformation("manifest 刷新尚未实现（M0）：mode={Mode}", mode);
-        return Task.FromResult(new VersionManifest("1.21.1", Array.Empty<VersionSummary>()));
+        if (_manifestClient is not null)
+        {
+            return await _manifestClient.GetManifestAsync(mode == ManifestRefreshMode.Force, ct);
+        }
+
+        _logger.LogInformation("manifest 客户端未注入（M0 配置）：mode={Mode}", mode);
+        return new VersionManifest(new LatestVersions("1.21.1", null), Array.Empty<VersionSummary>());
     }
 
     public Task<IReadOnlyList<LoaderVersionInfo>> GetLoaderVersionsAsync(
@@ -66,39 +91,131 @@ public sealed class LauncherFacade : ILauncherFacade
     }
 
     public Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<TaskInfo>>(Array.Empty<TaskInfo>());
+        Task.FromResult(_tasks.Snapshot());
 
-    public Task CancelTaskAsync(string taskId, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现任务取消。");
+    public Task CancelTaskAsync(string taskId, CancellationToken ct)
+    {
+        if (!_tasks.Cancel(taskId))
+        {
+            throw new KeyNotFoundException($"任务不存在：{taskId}");
+        }
 
-    public Task RetryTaskAsync(string taskId, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现任务重试。");
+        return Task.CompletedTask;
+    }
 
-    public Task<InstanceSummary> InstallAsync(
+    public Task RetryTaskAsync(string taskId, CancellationToken ct)
+    {
+        if (!_tasks.Retry(taskId))
+        {
+            throw new KeyNotFoundException($"任务不存在或不可重试：{taskId}");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async Task<InstanceSummary> InstallAsync(
+        InstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        if (_installer is null)
+        {
+            throw new NotSupportedException("安装器未注入。");
+        }
+
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var taskId = _tasks.Start(
+            TaskKind.Install,
+            request.InstanceId,
+            cts,
+            token => RunInstallAsync(request, new Progress<InstallProgress>(), token));
+
+        var throttled = new ThrottledProgress(
+            progress,
+            p => _tasks.Report(taskId, p.Percent, p.Message));
+
+        try
+        {
+            var result = await RunInstallAsync(request, throttled, cts.Token);
+            _tasks.Complete(taskId, TaskState.Succeeded, message: "安装完成");
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            _tasks.Complete(taskId, TaskState.Cancelled, message: "已取消");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _tasks.Complete(taskId, TaskState.Failed, "E3003", ex.Message);
+            throw;
+        }
+        finally
+        {
+            cts.Dispose();
+        }
+    }
+
+    private Task<InstanceSummary> RunInstallAsync(
         InstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现安装。");
+        _installer!.InstallAsync(request, progress, ct);
 
     public Task UpdateInstanceAsync(
         string instanceId, UpdateInstanceRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现实例更新。");
+        throw new NotSupportedException("M2 未实现实例更新。");
 
-    public Task RepairInstanceAsync(
-        string instanceId, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现实例修复。");
+    public async Task RepairInstanceAsync(
+        string instanceId, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        if (_installer is null)
+        {
+            throw new NotSupportedException("安装器未注入。");
+        }
+
+        var instances = await _sqlite.GetInstancesAsync(ct);
+        var instance = instances.FirstOrDefault(i => i.Id == instanceId)
+            ?? throw new KeyNotFoundException($"实例不存在：{instanceId}");
+
+        await _sqlite.UpdateInstanceStateAsync(instanceId, InstanceState.Repairing, ct);
+        var request = new InstallRequest(
+            instance.Id, instance.Name, instance.VersionId,
+            instance.Loader, instance.LoaderVersion, instance.Isolation,
+            InstallMode.Reinstall);
+        await InstallAsync(request, progress, ct);
+    }
 
     public Task<InstanceSummary> InstallModpackAsync(
         ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
         throw new NotSupportedException("M0 未实现整合包安装。");
 
-    public Task<GameSession> LaunchAsync(
-        string instanceId, IProgress<LaunchEvent> events, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现游戏启动。");
+    public async Task<GameSession> LaunchAsync(
+        string instanceId, IProgress<LaunchEvent> events, CancellationToken ct)
+    {
+        if (_launcher is null)
+        {
+            throw new NotSupportedException("启动服务未注入。");
+        }
 
-    public Task StopGameAsync(string instanceId, StopMode mode, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现游戏结束。");
+        return await _launcher.LaunchAsync(instanceId, username: null, events, ct);
+    }
 
-    public Task<IReadOnlyList<RunningSession>> GetRunningSessionsAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<RunningSession>>(Array.Empty<RunningSession>());
+    public Task StopGameAsync(string instanceId, StopMode mode, CancellationToken ct)
+    {
+        if (_launcher is null)
+        {
+            throw new NotSupportedException("启动服务未注入。");
+        }
+
+        return _launcher.StopGameAsync(instanceId, mode, ct);
+    }
+
+    public Task<IReadOnlyList<RunningSession>> GetRunningSessionsAsync(CancellationToken ct)
+    {
+        if (_launcher is null)
+        {
+            return Task.FromResult<IReadOnlyList<RunningSession>>([]);
+        }
+
+        return _launcher.GetRunningSessionsAsync(ct);
+    }
 
     public Task<AccountSummary> LoginAsync(
         LoginRequest request, IProgress<LoginEvent> progress, CancellationToken ct)

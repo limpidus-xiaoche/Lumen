@@ -134,6 +134,111 @@ public sealed class SqliteStore
         return result;
     }
 
+    public async Task UpsertInstanceAsync(
+        string id,
+        string name,
+        string rootPath,
+        string versionId,
+        LoaderKind loader,
+        string? loaderVersion,
+        IsolationLevel isolation,
+        InstanceState state,
+        string? javaPath = null,
+        int? memoryMb = null,
+        string extraJvmArgs = "",
+        CancellationToken ct = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO instances(
+              id, name, root_path, version_id, loader, loader_version, isolation, state,
+              java_path, memory_mb, extra_jvm_args, created_at)
+            VALUES($id, $name, $root, $version, $loader, $loaderVersion, $isolation, $state,
+                   $java, $memory, $extra, $created)
+            ON CONFLICT(id) DO UPDATE SET
+              name = excluded.name,
+              root_path = excluded.root_path,
+              version_id = excluded.version_id,
+              loader = excluded.loader,
+              loader_version = excluded.loader_version,
+              isolation = excluded.isolation,
+              state = excluded.state,
+              java_path = excluded.java_path,
+              memory_mb = excluded.memory_mb,
+              extra_jvm_args = excluded.extra_jvm_args;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$root", rootPath);
+        command.Parameters.AddWithValue("$version", versionId);
+        command.Parameters.AddWithValue("$loader", loader.ToString());
+        command.Parameters.AddWithValue("$loaderVersion", (object?)loaderVersion ?? DBNull.Value);
+        command.Parameters.AddWithValue("$isolation", (int)isolation);
+        command.Parameters.AddWithValue("$state", state.ToString());
+        command.Parameters.AddWithValue("$java", (object?)javaPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$memory", (object?)memoryMb ?? DBNull.Value);
+        command.Parameters.AddWithValue("$extra", extraJvmArgs);
+        command.Parameters.AddWithValue("$created", DateTimeOffset.UtcNow.ToString("O"));
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task UpdateInstanceStateAsync(
+        string id, InstanceState state, CancellationToken ct = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE instances SET state=$state WHERE id=$id;";
+        command.Parameters.AddWithValue("$state", state.ToString());
+        command.Parameters.AddWithValue("$id", id);
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task RecordJournalAsync(
+        string instanceId, string step, string status, string detail, CancellationToken ct = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO install_journal(instance_id, step, status, detail, updated_at)
+            VALUES($instance, $step, $status, $detail, $updated)
+            ON CONFLICT(instance_id, step) DO UPDATE SET
+              status = excluded.status,
+              detail = excluded.detail,
+              updated_at = excluded.updated_at;
+            """;
+        command.Parameters.AddWithValue("$instance", instanceId);
+        command.Parameters.AddWithValue("$step", step);
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$detail", detail);
+        command.Parameters.AddWithValue("$updated", DateTimeOffset.UtcNow.ToString("O"));
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<(string Step, string Status, string Detail)>> GetJournalAsync(
+        string instanceId, CancellationToken ct = default)
+    {
+        var result = new List<(string, string, string)>();
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT step, status, detail FROM install_journal
+            WHERE instance_id=$instance ORDER BY updated_at;
+            """;
+        command.Parameters.AddWithValue("$instance", instanceId);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            result.Add((reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? string.Empty : reader.GetString(2)));
+        }
+
+        return result;
+    }
+
     private static async Task ExecuteAsync(SqliteConnection connection, string sql, CancellationToken ct)
     {
         await using var command = connection.CreateCommand();

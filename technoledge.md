@@ -4,7 +4,7 @@
 
 | 项目代号 | **`Lumen`（已确认）** |
 |---|---|
-| 文档版本 | **v0.5** — 复审回写：CmlLib 边界、协作身份、许可存证、编码/源/任务/SSRF 等 |
+| 文档版本 | **v0.7** — M3 实现落地：参数拼装 / Java 选择 / argfile / 进程与会话；其余沿用 v0.5/v0.6 |
 | 日期 | 2026-10-24 |
 | 目标平台 | **v1 = Windows 10/11 x64 only**；跨平台列入 v2 非目标 |
 | 开发者 | A：核心（Core / CLI / 打包）　B：应用（Avalonia UI / 交互 / 生态页面） |
@@ -163,9 +163,13 @@ tests/
 
 > SDK 风格 csproj 自动包含 `.cs`，**新增文件不需要改 csproj**；只有新增 NuGet 包才动 `Directory.Packages.props`。
 
+> **M0 例外（已确认，2026-10-24）**：`src/Launcher.App/**` 与 `tests/Launcher.App.Tests/**` 由 A 代搭最小脚手架（六页 + `FakeLauncherFacade` + 深色主题）。自 B 首次提交起，这些路径**只由 B 修改**，A 不再改动；B 可在 `feat/ui-m0` 上整体重写，无需保留现有 XAML/VM 结构。
+
+> **前端分工更新（2026-10-24）**：App 归属仍为 B；后续由 A 提供**最小基础模型**（页面骨架、绑定、数据接口），B 负责优化与设计定稿。A 只在 B 明确请求时修改 App，且以最小结构为主。
+
 ---
 
-## 5. 接口契约（v0.4）
+## 5. 接口契约（v0.5）
 
 UI 只认下面的门面；Core 内部接口允许 A 自由重构，但不能破坏 `ILauncherFacade` 与 Protocol DTO。
 
@@ -241,7 +245,8 @@ public sealed record InstallRequest(
     LoaderKind Loader,
     string? LoaderVersion,
     IsolationLevel Isolation,
-    InstallMode Mode);           // New | Reinstall | ChangeLoader
+    InstallMode Mode,            // New | Reinstall | ChangeLoader
+    bool SkipAssets = false);    // 仅 CLI 快速验证使用；UI 默认 false
 
 public sealed record UpdateInstanceRequest(
     string? DisplayName, string? VersionId, LoaderKind? Loader,
@@ -354,6 +359,7 @@ public enum DownloadSourceMode { Auto, Official, Mirror }
 | v0.3 | 2026-10-24 | 决策定稿：不签名仅 SHA-256；MIT；GitHub 私有；bangbang93 为发布门禁 | 决策 |
 | v0.4 | 2026-10-24 | 补 `StopGameAsync/GetTasksAsync/GetInstanceAsync/SetActiveAccountAsync`；`LoginRequest` 显式 `AuthMode`；`ImportExternalAsync` 带进度；明确回调线程与节流 | 评审反馈 |
 | v0.5 | 2026-10-24 | 补 `CancelTaskAsync/RetryTaskAsync/GetRunningSessionsAsync`；补齐全部 DTO 字段与枚举；明确 CmlLib 能力边界与 M0 门禁 | 复审反馈 |
+| v0.6 | 2026-10-24 | `InstallRequest.SkipAssets`（仅 CLI 快速验证）；M2 下载/安装/任务实现 | M2 |
 
 ---
 
@@ -533,6 +539,7 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
   - **复制导入（默认）**：把所选实例目录复制到 `instances/<id>/`，外部目录不动；适合"先试用"。
   - **原地接管**：`root_path` 直接指向外部目录，不复制；删除实例只解除登记，**永不删外部文件**。UI 必须明确提示"原地模式下本启动器会直接读写该目录"。
 - **删除安全**：`DeleteInstanceAsync(keepSaves)`；`true` 时先把 `saves/`、`screenshots/` 移到 `exports/<instance>-<timestamp>/` 再删实例。
+- **默认语言**：安装与首次启动前检查 `options.txt`，缺失时写入 `lang:zh_cn`；已存在则不覆盖（尊重用户修改）。
 
 ### 6.8 Diagnostics（A）
 
@@ -748,21 +755,22 @@ docs: 契约 v0.5
 - `[B]` Avalonia 壳 + 导航 + 六个空页 + 主题基线 + `FakeLauncherFacade`
 - `[AB]` 冻结 §5 契约 **v0.5**；提交 `.githooks/pre-push`，每人执行 `git config core.hooksPath .githooks`
 - `[A]` 产出 **CmlLib.Core 评估结论**（§6.1.1 门禁；无结论则默认自研）
-- **验收**：两人 build 绿；六页可切换；架构测试通过；离线身份可生成；hook 生效（直推 main 被本地拒绝）。
+- `[B]` **接管 App 脚手架**：在 `feat/ui-m0` 上确认或重写六页结构、主题与 Fake 数据；首次提交即视为验收
+- **验收**：两人 build 绿；六页可切换；架构测试通过；离线身份可生成；hook 生效（直推 main 被本地拒绝）；B 已接管 App 归属。
 
-### M1 元数据 + Java
+### M1 元数据 + Java（A ✅ 2026-10-24；B 基础模型 ✅，待 B 优化定稿）
 
 - `[A]` manifest、version.json、规则判定、继承合并、`JavaLocator`（含 32/64 注册表视图）
 - `[B]` 下载页版本列表、设置页 Java 列表
 - **验收**：列出全部版本与本机 JDK（含仅 32 位的旧 JRE）。
 
-### M2 原版安装
+### M2 原版安装（A ✅ 2026-10-24；B 待做）
 
 - `[A]` 下载引擎（阈值分片/顺序哈希/失败分类/续传 meta/持久队列/磁盘预检/URL 安全校验）+ Vanilla 安装 + journal + 修复
 - `[B]` 任务中心、进度 UI、**`CancelTaskAsync`/`RetryTaskAsync`**、启动时恢复任务
 - **验收**：装 1.21.x SHA1 全通过；断网续传；重复安装秒完成；中断后可"继续/修复"。
 
-### M3 启动原版（离线）
+### M3 启动原版（离线）（A ✅ 2026-10-24；B 待做）
 
 - `[A]` `ArgumentBuilder`、`ArgFileWriter`（生命周期与编码）、`ProcessRunner`、**`GetRunningSessionsAsync` + 孤儿进程识别**、退出归因
 - `[B]` 实例卡片、启动按钮、实时日志、历史日志列表
@@ -1008,3 +1016,9 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | v0.5 P0-7 下载 URL 安全 | §6.2（https/白名单/私网/重定向/无 hash 拒绝）、§11 |
 | v0.5 P0-8 lzma | §6.4（只取 raw / `E4003`）、§8.2 |
 | v0.5 P1 其余 | §5 DTO 字段、§5 `GetRunningSessionsAsync`、§9.0 hook 安装、§6.6 authlib pin、§12 发布形态、§12.1 CI 生成、§6.7 导入模式、§7.1 路径/GC、§10 M0 版本、§1 范围、§6.4 x64、§11 矩阵 |
+| M0 归属（2026-10-24） | §4（M0 例外）、§10 M0（B 接管项） | App 脚手架由 A 代搭，B 接管后只由 B 修改 |
+| M1（A）（2026-10-24） | §6.1（rules/合并）、§6.4（Java 探测）、§10 M1 | ManifestClient / VersionResolver / RuleEvaluator / JavaLocator；CLI versions/java/resolve |
+| M1 前端基础模型（2026-10-24） | §4（前端分工）、§10 M1 | 下载页真实 manifest 列表、设置页 Java 列表；App 接真实 `LauncherFacade`；B 负责优化 |
+| M2（A）（2026-10-24） | §5（SkipAssets）、§6.2（下载）、§6.3（安装）、§10 M2 | DownloadEngine / VanillaInstaller / TaskRegistry / 修复；实测 1.12.2 完整安装 |
+| M3（A）（2026-10-24） | §5（Launch/Stop/Sessions）、§6.5（参数/argfile）、§10 M3 | ArgumentBuilder / JavaVersionPolicy / ArgFileWriter / LaunchService；1.21.1 真实启动通过 |
+| 默认语言（2026-10-24） | §6.7 | `GameOptions` 写入 `lang:zh_cn`；不覆盖已有 options.txt |

@@ -1,6 +1,11 @@
 namespace Launcher.Protocol;
 
-public sealed record VersionManifest(string LatestRelease, IReadOnlyList<VersionSummary> Versions);
+public sealed record VersionManifest(LatestVersions? Latest, IReadOnlyList<VersionSummary> Versions)
+{
+    public string LatestRelease => Latest?.Release ?? string.Empty;
+}
+
+public sealed record LatestVersions(string Release, string? Snapshot);
 
 public sealed record VersionSummary(string Id, string Type, string Url, string? Sha1);
 

@@ -33,7 +33,7 @@ public partial class MainWindowViewModel : ObservableObject
         _logs = new LogsViewModel(facade);
 
         var home = new HomeViewModel(facade);
-        var download = new DownloadViewModel();
+        var download = new DownloadViewModel(facade);
         var settings = new SettingsViewModel(facade, _instances, _logs, ShowSubPage);
 
         Pages =

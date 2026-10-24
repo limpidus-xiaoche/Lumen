@@ -27,6 +27,14 @@
 - [x] `technoledge.md` 升版 **v0.5**：P0/P1 全部回写（CmlLib 边界、协作身份、许可存证、编码/源/任务/SSRF/lzma、DTO、孤儿进程、hook、发布形态、路径/GC）
 - [ ] **临时**：使用仓库 deploy key 推送（`ttss4096` 账号暂不可用）；账号恢复后迁移到 collaborators + 用户级 SSH，deploy key 降为只读
 - [x] **M0 完成**：解决方案 + Protocol/Core/App/CLI + SQLite v3 + 离线身份 + 六页 Avalonia 壳 + FakeLauncherFacade + 8 项测试 + pre-push hook 文件
+  - **归属说明**：`src/Launcher.App/**` 与 `tests/Launcher.App.Tests/**` 由 **A 代搭最小脚手架**（六页 + Fake + 深色主题），由 **B 接管**；B 首次提交后 App 路径只由 B 修改。
+- [ ] B 接管 App：在 `feat/ui-m0` 分支确认或重写脚手架，并在提交信息中说明
+- [x] **M1（A）完成**：manifest（含 `latest` 解析）、version.json、rules、`inheritsFrom` 合并、Java 探测（32/64 注册表）
+- [x] **M1（B）基础模型**：下载页接真实 manifest 列表、设置页接真实 Java 列表；B 负责优化定稿
+- [x] **M2（A）完成**：下载引擎（分片/续传/SHA1/URL 安全）、Vanilla 安装、install journal、秒装、修复、CLI install/repair
+- [ ] **M2（B）**：任务中心、安装进度 UI、取消/重试、启动恢复（B 负责）
+- [x] **M3（A）完成**：参数拼装/变量展开、Java 选择、argfile 编码与生命周期、进程启动/日志、退出归因、运行会话、CLI launch/stop/sessions
+- [ ] **M3（B）**：实例卡片、启动按钮、实时日志、历史日志（B 负责）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -109,6 +117,51 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | GUI 冒烟 | `Lumen.exe` 启动并保持运行；日志写入 `%LOCALAPPDATA%\Lumen\logs` |
 | 架构测试 | Core 不依赖 Avalonia / Hosting / DI |
 | pre-push hook | 文件已提交，待执行 `git config core.hooksPath .githooks` 启用 |
+| App 归属 | A 代搭脚手架；B 接管；后续基础模型由 A 提供、B 优化 |
+
+## M1 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| `versions --limit 5` | `latest_release=26.3` / `latest_snapshot=26.4-snapshot-5`，清单解析正确 |
+| `resolve 1.21.1` | mainClass `net.minecraft.client.main.Main`；97 个库；28 game args；11 jvm args；assetIndex 17 |
+| `java` | 检出 6 个 JDK（Oracle 25/21、Temurin 21/17、Microsoft 21，全部 x64） |
+| 测试 | **28 项通过**（Core 23 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+| 前端基础模型 | 下载页接 `RefreshManifestAsync`（真实版本列表）；设置页接 `GetSnapshotAsync`（Java 列表）；App 启动使用真实 `LauncherFacade` |
+| GUI 冒烟（真实 Core） | `Lumen.exe` 启动，SQLite 初始化成功，日志无错误 |
+
+> B 部分只做了基础模型（数据绑定 + 列表），视觉与交互仍由 B 优化定稿。
+
+## M2 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| `install 1.21.1`（完整资源） | 成功；70 个库；**787.6 MB** 资源；客户端 jar SHA1 与 manifest 一致 |
+| `install 1.12.2`（完整资源） | 成功；1290 个 asset、105 个库文件、11 个 native；客户端 SHA1 一致 |
+| 秒装 | 重复安装 1.12.2（含资源）**1.61s**；1.21.1（跳过资源）**1.14s** |
+| 修复 | 删除 `patchy-1.3.9.jar` 后 `repair test-1.12.2`，**3.78s** 恢复 |
+| 测试 | **35 项通过**（Core 30 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+| 安全 | URL 校验：仅 https、host 白名单、私网/环回拒绝、重定向逐跳复检；单测覆盖 |
+
+> B 部分（任务中心 UI、进度展示、取消/重试按钮、启动恢复）尚未做；Core 已提供 `TaskRegistry` 与 `CancelTaskAsync/RetryTaskAsync`。
+> 断点续传逻辑已实现（`.part` + `.part.meta` + 分片文件），但本轮未做"中途强杀后续传"的实测。
+
+## M3 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| 真实启动 | `launch test-1.21.1 --username Player` 成功；游戏进入主菜单（日志出现 atlas 创建） |
+| 运行会话 | `sessions` 显示 `pid=83128`；`stop` 后输出"没有运行中的游戏" |
+| 停止 | `stop` 使用 Graceful，游戏打印 `Stopping!`，退出码 **0** |
+| 日志 | stdout/stderr 实时回传；退出归因已接（崩溃报告/退出码） |
+| 测试 | **50 项通过**（Core 45 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+| 默认语言 | 安装/首次启动前写入 `options.txt` `lang:zh_cn`；实机启动并退出后仍为 `zh_cn` |
+| 已知 | 1.21.1 命令行未超 24K，真实 argfile 启动未覆盖；Java 8 超长命令行未实现 wrapper（报 `E5003`） |
+
+> 离线账号的 Realms 认证会报 `Failed to parse into SignedJWT`，属于预期（没有正版 token），不影响本地游戏。
 
 ## 目标样本
 
@@ -198,4 +251,47 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              设置页新增深色模式切换（M0 占位，直接生效）；FakeLauncherFacade 进度对齐契约
              （200ms/次，前两阶段 Percent=-1 不确定态）；build 0 警告 0 错误，App.Tests 2 项通过；
              hook 生效验证：直推 main 被本地拒绝；待 owner 网页端合并 feat/ui-m0。
+
+[2026-10-24] B（UI）window-chrome 定稿：
+             无边框窗口 920×560（自定义标题栏：麦谷Limpidus 亮青标识 + 最小化/关闭）；
+             账号区改为右上角竖排卡片（模式 pill 放大 15px + 80px 头像 + 用户名）；底部版本号 Lumen 0.1 · M0。
+
+[2026-10-24] M0 App 归属确认：
+             A 代搭 `src/Launcher.App` 与 `tests/Launcher.App.Tests` 的最小脚手架（六页 + Fake + 深色主题）；
+             B 接管，可整体重写；自 B 首次提交起，App 路径只由 B 修改，A 不再改动。
+
+[2026-10-24] 前端策略更新：App 归属仍为 B；后续由 A 提供**最小基础模型**（页面骨架/绑定/数据接口），
+             B 负责优化与设计定稿；A 只在 B 明确请求时修改 App。
+
+[2026-10-24] M1（A）完成：
+             ManifestClient（官方 + BMCLAPI fallback + 15 分钟缓存，正确解析 latest.release/snapshot）；
+             VersionResolver（inheritsFrom 递归合并、库按 group:artifact 去重、参数拼接）；
+             RuleEvaluator（os.name/arch/version/features）；JavaLocator（JAVA_HOME/注册表 32+64/常见目录/PATH/内置 runtime）；
+             JavaVersionParser（release 优先、属性回退）；CLI 增加 versions / java / resolve；26 项测试通过。
+
+[2026-10-24] M1 前端基础模型：
+             App 改用真实 LauncherFacade（CoreServices 组装路径/设置/SQLite/manifest/Java）；
+             下载页加载 manifest 并列出真实版本；设置页加载并显示本机 Java；
+             新增 2 项 ViewModel 测试（总计 28 项）；视觉与交互待 B 优化。
+
+[2026-10-24] M2（A）完成：
+             DownloadEngine（16MB 阈值分片、8MB/片、Range 续传、顺序 SHA1、镜像回退、URL 安全校验、逐跳重定向）；
+             VanillaInstaller（client jar/libraries/natives/assets、legacy virtual、磁盘预检、install journal、状态机）；
+             TaskRegistry + ThrottledProgress（10Hz）；Facade install/repair/cancel/retry/getTasks；
+             CLI install/repair；35 项测试通过；1.21.1（787.6 MB 资源）与 1.12.2 完整安装、秒装、修复均实测通过。
+
+[2026-10-24] M3（A）完成：
+             ArgumentBuilder（legacy/现代参数、rules、变量展开、未解析 E5002、classpath）；
+             JavaVersionPolicy（版本约束 + 1.13+ 64 位过滤）；ArgFileWriter（ANSI/UTF-8、转义、首行后删除、清扫）；
+             LaunchService（进程启动、stdout/stderr、退出归因、RunningSessionStore 持久化）；CLI launch/stop/sessions；
+             48 项测试通过；1.21.1 真实启动、会话可见、Graceful 停止 exit 0 已实测。
+
+[2026-10-24] 默认游戏语言：
+             `GameOptions.EnsureDefaultLanguage` 在安装与启动前检查 `options.txt`，缺失时写入 `lang:zh_cn`；
+             已有文件不覆盖（尊重用户改动）；当前实例已修正并在实机启动/退出后验证仍为 zh_cn；测试增至 50 项。
+
+[2026-10-24] M1 合并（feat/m1-merge）：
+             合入 window-chrome（B 布局定稿）+ m3-core（A 全部核心 M1-M3）；
+             设计以 B 为准，数据接 A 真实门面：下载页真实版本清单、设置页真实 Java 检测；
+             Home 启动按钮 M1 暂不接真实启动（M2 安装 UI 未接），待 M3 阶段接线。
 ```
