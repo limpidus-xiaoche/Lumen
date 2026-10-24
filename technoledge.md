@@ -4,7 +4,7 @@
 
 | 项目代号 | **`Lumen`（已确认）** |
 |---|---|
-| 文档版本 | **v0.9** — M5（A）落地：Fabric / Forge 官方 installer / NeoForge 代码路径；其余沿用 v0.8 |
+| 文档版本 | **v0.10** — M6（A）落地：实例删除/外部导入/模组启停；其余沿用 v0.9 |
 | 日期 | 2026-10-24 |
 | 目标平台 | **v1 = Windows 10/11 x64 only**；跨平台列入 v2 非目标 |
 | 开发者 | A：核心（Core / CLI / 打包）　B：应用（Avalonia UI / 交互 / 生态页面） |
@@ -541,12 +541,18 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 |---|---|---|---|
 | `None` | `shared/game/`（标准 `.minecraft` 布局） | 无（老鸟模式，可能互相污染） | versions / libraries / assets / runtimes |
 | `ModsConfig`（默认） | `instances/<id>/` | `mods/ config/ saves/ resourcepacks/ shaderpacks/ logs/ crash-reports/` | 同上 |
-| `Full` | `instances/<id>/` | 上述 + `options.txt screenshots/` | 同上（**禁止复制 libraries/assets**，否则磁盘爆炸） |
+| `Full` | `instances/<id>/` | 与 ModsConfig 相同的目录布局；v1 额外预创建全部子目录，**不复制** libraries/assets | 同上（**禁止复制 libraries/assets**，否则磁盘爆炸） |
 
-- **natives 归属（修订）**：`shared/natives/<versionId>/<arch>-<hash>/`，按 **version + arch 唯一**，绝不实例内共享；解压时加文件锁，避免并行启动不同版本互相覆盖。
-- 外部目录：PCL / HMCL / MultiMC / 原生 `.minecraft` 只读识别。导入二选一：
-  - **复制导入（默认）**：把所选实例目录复制到 `instances/<id>/`，外部目录不动；适合"先试用"。
-  - **原地接管**：`root_path` 直接指向外部目录，不复制；删除实例只解除登记，**永不删外部文件**。UI 必须明确提示"原地模式下本启动器会直接读写该目录"。
+> **实现说明（M6 落地）**：DB 的 `root_path` 是 gameDir 的唯一权威，启动与模组扫描都读取该字段；`None` 共用 `shared/game`，`ModsConfig/Full` 各自独立目录。v1 中 ModsConfig 与 Full 的隔离效果一致（都在实例目录），差异仅保留为未来共享 `options.txt/screenshots` 的实现位。
+
+- **natives 归属**：`shared/natives/<gameVersion>/x86_64/`，按 **版本 + 架构唯一**，绝不实例内共享；v1 仅 x64。
+- 外部目录识别（M6 落地）：
+  - MultiMC：`mmc-pack.json`（`components` 的 `net.minecraft` / `net.fabricmc.fabric-loader` / `net.minecraftforge` / `net.neoforged`）+ `instance.cfg` 名称；gameDir 取 `minecraft/` 或 `.minecraft/`。
+  - HMCL：`modpack.json` 的 `gameVersion` / `minecraftVersion`。
+  - PCL / 原生：`versions/<id>/<id>.json`，取最近修改的版本；加载器从版本 ID 反推。
+  - **v1 只实现复制导入**：复制 mods/config/saves/options.txt 等游戏内容，**不复制** `libraries/assets/versions/runtime/logs`；外部目录不动。
+  - 原地接管：DB `root_path` 已支持指向外部目录、删除只解除登记并**永不删外部文件**；v1 不提供入口，留待 v2。
+  - 导入不保证补齐共享 `libraries/assets`；需要时再走修复/安装。
 - **删除安全**：`DeleteInstanceAsync(keepSaves)`；`true` 时先把 `saves/`、`screenshots/` 移到 `exports/<instance>-<timestamp>/` 再删实例。
 - **默认语言**：安装与首次启动前检查 `options.txt`，缺失时写入 `lang:zh_cn`；已存在则不覆盖（尊重用户修改）。
 
@@ -685,6 +691,7 @@ CREATE TABLE install_journal(
 | `E3001` | `err.install.loader_failed` | 加载器安装器失败 | 展示 installer 日志尾部 |
 | `E3002` | `err.install.missing_profiles` | 缺少 `launcher_profiles.json` | 自动创建后重试 |
 | `E3003` | `err.install.interrupted` | 安装中断（有 journal） | 提供"继续/修复" |
+| `E3004` | `err.import.unrecognized` | 外部实例无法识别（缺版本/清单文件） | 提示支持的目录类型或手动指定版本 |
 | `E4001` | `err.java.not_found` | 未找到合适 Java | 引导下载 JRE |
 | `E4002` | `err.java.memory_out_of_range` | 内存参数越界 | 回落到合法范围 |
 | `E4003` | `err.java.runtime_lzma_only` | java-runtime 仅提供 lzma | 引导换供应商 JRE |
@@ -800,11 +807,14 @@ docs: 契约 v0.5
   - Forge 1.20.1 + 47.4.28：安装 + 启动通过（`MinecraftForge v47.4.28 Initialized`，exit 0）
   - NeoForge：本机 `maven.neoforged.net` DNS 被污染（解析到 Facebook IP），安装器无法下载 → 代码路径已实现，待正常网络补测
 
-### M6 实例与模组
+### M6 实例与模组（A ✅ 2026-10-24；B 待做）
 
-- `[A]` 隔离语义、natives 归属、外部导入、模组扫描/启停、删除保留存档
+- `[A]` 隔离语义（root_path 权威）、外部导入（MultiMC/HMCL/原生复制）、模组扫描/启停、删除保留存档、CLI `mods/mods-toggle/import/delete`
 - `[B]` 实例管理页、模组列表、导入向导、删除确认（保留存档选项）
 - **验收**：两实例 mods 互不影响；并行启动不同版本不冲突；误删可保留存档。
+  - 模组目录按实例分离；`mods` 扫描与 `mods-toggle` 重命名实测通过；Fabric 启动时确实读取实例 `mods/` 目录（用一个无代码 jar 验证了加载路径）
+  - 外部 MultiMC 目录导入：识别、复制、登记通过；`libraries` 未复制；删除 `--keep-saves` 导出 saves 后删除实例、外部目录不动
+  - 并行启动不同版本沿用 M3/M5 的共享 libraries/assets + 独立 natives/实例目录
 
 ### M7 整合包
 

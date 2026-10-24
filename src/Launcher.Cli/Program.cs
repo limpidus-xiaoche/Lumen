@@ -436,6 +436,108 @@ loadersCommand.SetAction(result =>
     }
 });
 
+var modsInstanceArgument = new Argument<string>("instance")
+{
+    Description = "实例 ID",
+};
+var modsToggleArgument = new Argument<string>("mod")
+{
+    Description = "模组 ID（文件名去掉 .jar）",
+};
+var modsDisableOption = new Option<bool>("--disable")
+{
+    Description = "禁用该模组（默认启用）",
+};
+
+var modsCommand = new Command("mods", "列出实例模组");
+modsCommand.Arguments.Add(modsInstanceArgument);
+modsCommand.SetAction(result =>
+{
+    var instanceId = result.GetValue(modsInstanceArgument)
+        ?? throw new ArgumentException("缺少实例 ID");
+    var mods = facade.ScanModsAsync(instanceId, CancellationToken.None).GetAwaiter().GetResult();
+    if (mods.Count == 0)
+    {
+        Console.WriteLine("没有模组。");
+        return;
+    }
+
+    foreach (var mod in mods)
+    {
+        Console.WriteLine(
+            $"{(mod.Enabled ? "on " : "off")}\t{mod.Id}\t{mod.Name}\t{mod.Version}\t{mod.FileName}");
+    }
+});
+
+var modsToggleCommand = new Command("mods-toggle", "启用/禁用模组");
+modsToggleCommand.Arguments.Add(modsInstanceArgument);
+modsToggleCommand.Arguments.Add(modsToggleArgument);
+modsToggleCommand.Options.Add(modsDisableOption);
+modsToggleCommand.SetAction(result =>
+{
+    var instanceId = result.GetValue(modsInstanceArgument)
+        ?? throw new ArgumentException("缺少实例 ID");
+    var modId = result.GetValue(modsToggleArgument)
+        ?? throw new ArgumentException("缺少模组 ID");
+    var enabled = !result.GetValue(modsDisableOption);
+    facade.SetModEnabledAsync(instanceId, modId, enabled, CancellationToken.None)
+        .GetAwaiter().GetResult();
+    Console.WriteLine($"{(enabled ? "enabled" : "disabled")} id={modId}");
+});
+
+var importPathArgument = new Argument<string>("path")
+{
+    Description = "外部实例目录（.minecraft / MultiMC / HMCL）",
+};
+
+var importCommand = new Command("import", "导入外部实例（复制）");
+importCommand.Arguments.Add(importPathArgument);
+importCommand.SetAction(result =>
+{
+    var path = result.GetValue(importPathArgument)
+        ?? throw new ArgumentException("缺少目录路径");
+    var progress = new SyncProgress<ImportProgress>(p =>
+    {
+        if (p.Stage == "detect")
+        {
+            Console.WriteLine($"detected={p.CurrentPath}");
+        }
+        else if (p.Percent >= 99 || p.BytesDone == p.TotalBytes)
+        {
+            Console.WriteLine($"copy {p.Percent:F1}%");
+        }
+    });
+
+    var imported = facade.ImportExternalAsync(path, progress, CancellationToken.None)
+        .GetAwaiter().GetResult();
+    foreach (var instance in imported)
+    {
+        Console.WriteLine(
+            $"imported id={instance.Id} version={instance.VersionId} loader={instance.Loader}");
+    }
+});
+
+var deleteInstanceArgument = new Argument<string>("instance")
+{
+    Description = "要删除的实例 ID",
+};
+var keepSavesOption = new Option<bool>("--keep-saves")
+{
+    Description = "先把 saves/screenshots 导出到 exports 再删除",
+};
+
+var deleteCommand = new Command("delete", "删除实例");
+deleteCommand.Arguments.Add(deleteInstanceArgument);
+deleteCommand.Options.Add(keepSavesOption);
+deleteCommand.SetAction(result =>
+{
+    var instanceId = result.GetValue(deleteInstanceArgument)
+        ?? throw new ArgumentException("缺少实例 ID");
+    facade.DeleteInstanceAsync(instanceId, result.GetValue(keepSavesOption), CancellationToken.None)
+        .GetAwaiter().GetResult();
+    Console.WriteLine($"deleted id={instanceId}");
+});
+
 var instancesCommand = new Command("instances", "列出实例");
 instancesCommand.SetAction(_ =>
 {
@@ -524,6 +626,10 @@ root.Subcommands.Add(stopCommand);
 root.Subcommands.Add(sessionsCommand);
 root.Subcommands.Add(loadersCommand);
 root.Subcommands.Add(instancesCommand);
+root.Subcommands.Add(modsCommand);
+root.Subcommands.Add(modsToggleCommand);
+root.Subcommands.Add(importCommand);
+root.Subcommands.Add(deleteCommand);
 root.Subcommands.Add(loginCommand);
 root.Subcommands.Add(accountsCommand);
 root.Subcommands.Add(useCommand);

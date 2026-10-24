@@ -72,9 +72,12 @@ public sealed class LaunchService
         var settings = _settings.Load();
         var java = SelectJava(detail, settings);
 
-        var gameDir = instance.Isolation == IsolationLevel.None
-            ? Path.Combine(_paths.SharedDir, "game")
-            : Path.Combine(_paths.InstancesDir, instanceId);
+        var rootPath = await _sqlite.GetRootPathAsync(instanceId, ct);
+        var gameDir = !string.IsNullOrWhiteSpace(rootPath)
+            ? rootPath
+            : instance.Isolation == IsolationLevel.None
+                ? Path.Combine(_paths.SharedDir, "game")
+                : Path.Combine(_paths.InstancesDir, instanceId);
 
         GameOptions.EnsureDefaultLanguage(gameDir);
 

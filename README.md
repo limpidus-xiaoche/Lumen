@@ -39,6 +39,8 @@
 - [ ] **M4（B）**：账户页、登录流程、换机后重新登录引导（B 负责）
 - [x] **M5（A）完成**：加载器版本清单（Fabric/Forge/NeoForge）、Fabric profile 合并安装、Forge/NeoForge 官方 installer headless 安装、本地版本解析、换加载器、CLI `loaders` / `install --loader`
 - [ ] **M5（B）**：安装向导（版本 + 加载器 + 加载器版本列表）（B 负责）
+- [x] **M6（A）完成**：`root_path` 作为 gameDir 权威、MultiMC/HMCL/原生实例复制导入、模组扫描与启停、删除保留存档、CLI `mods/mods-toggle/import/delete`
+- [ ] **M6（B）**：实例管理页、模组列表、导入向导、删除确认（B 负责）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -315,4 +317,15 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              真机：Fabric 1.21.1 + 0.20.1 安装并启动成功；Forge 1.20.1 + 47.4.28 安装并启动成功（MinecraftForge v47.4.28），
              均 Graceful 停止 exit 0。NeoForge：本机 maven.neoforged.net DNS 被污染（解析到 Facebook IP），
              安装器无法下载，代码路径已实现但未真机验收。放弃 bangbang93.ForgeInstaller，统一走官方 installer。
+
+[2026-10-24] M6（A）完成：
+             DB `root_path` 成为 gameDir 唯一权威（启动/模组扫描/删除都读它）；外置目录只登记不删除。
+             ModScanner：扫描 mods/*.jar 与 *.jar.disabled，读取 fabric.mod.json / mods.toml 元数据，
+             启停通过重命名 `.disabled` 实现；CLI mods / mods-toggle。
+             ExternalImporter：识别 MultiMC（mmc-pack.json）、HMCL（modpack.json）、PCL/原生（versions）并复制游戏内容，
+             排除 libraries/assets/versions/runtime/logs；CLI import。
+             删除：`--keep-saves` 先把 saves/screenshots 移到 exports，再删受管实例目录；外部目录与 shared/game 不动。
+             测试增至 78 项（新增模组扫描/启停、MultiMC/原生识别与复制、保留存档删除、外部目录保护）。
+             真机：模组扫描与启停通过；MultiMC 目录导入成功（未复制 libraries）；delete --keep-saves 导出存档并删除；
+             清理了验证用假 mod（该 jar 因 PowerShell 写入 BOM 导致 Fabric 解析失败，与启动器无关）。
 ```

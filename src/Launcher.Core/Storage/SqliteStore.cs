@@ -184,6 +184,30 @@ public sealed class SqliteStore
         await command.ExecuteNonQueryAsync(ct);
     }
 
+    public async Task<string?> GetRootPathAsync(string id, CancellationToken ct = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT root_path FROM instances WHERE id=$id;";
+        command.Parameters.AddWithValue("$id", id);
+        var value = await command.ExecuteScalarAsync(ct);
+        return value as string;
+    }
+
+    public async Task DeleteInstanceAsync(string id, CancellationToken ct = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            DELETE FROM instances WHERE id=$id;
+            DELETE FROM install_journal WHERE instance_id=$id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
     public async Task UpdateInstanceStateAsync(
         string id, InstanceState state, CancellationToken ct = default)
     {

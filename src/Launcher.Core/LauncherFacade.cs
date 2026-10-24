@@ -2,6 +2,7 @@ using System.IO.Compression;
 using Launcher.Core.Accounts;
 using Launcher.Core.Auth;
 using Launcher.Core.Install;
+using Launcher.Core.Instances;
 using Launcher.Core.Java;
 using Launcher.Core.Launch;
 using Launcher.Core.Meta;
@@ -100,13 +101,14 @@ public sealed class LauncherFacade : ILauncherFacade
         var summary = instances.FirstOrDefault(i => i.Id == instanceId)
             ?? throw new KeyNotFoundException($"实例不存在：{instanceId}");
 
+        var gameDir = await ResolveGameDirAsync(summary, ct);
         return new InstanceDetail(
             summary,
-            Path.Combine(_paths.InstancesDir, instanceId),
+            gameDir,
             JavaPath: null,
             MemoryMb: _settingsStore.Load().MaxMemoryMb,
             ExtraJvmArgs: string.Empty,
-            ModCount: 0,
+            ModCount: ModScanner.Scan(gameDir, summary.Loader).Count,
             DiskUsageBytes: 0);
     }
 
@@ -350,21 +352,135 @@ public sealed class LauncherFacade : ILauncherFacade
     private static AccountSummary ToSummary(StoredAccount account, bool isActive) =>
         new(account.Id, account.Type, account.Username, account.Uuid, account.AvatarUrl, isActive, account.ExpiresAt);
 
-    public Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<ModEntry>>(Array.Empty<ModEntry>());
+    public async Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct)
+    {
+        var (instance, gameDir) = await FindInstanceAsync(instanceId, ct);
+        return ModScanner.Scan(gameDir, instance.Loader);
+    }
 
-    public Task SetModEnabledAsync(string instanceId, string modId, bool enabled, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现模组启停。");
+    public async Task SetModEnabledAsync(
+        string instanceId, string modId, bool enabled, CancellationToken ct)
+    {
+        var (_, gameDir) = await FindInstanceAsync(instanceId, ct);
+        if (!ModScanner.SetEnabled(gameDir, modId, enabled))
+        {
+            throw new KeyNotFoundException($"模组不存在：{modId}");
+        }
+    }
 
     public async Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct)
     {
-        await Task.CompletedTask;
-        throw new NotSupportedException("M0 未实现实例删除。");
+        var (instance, gameDir) = await FindInstanceAsync(instanceId, ct);
+
+        if (_launcher is not null)
+        {
+            var running = await _launcher.GetRunningSessionsAsync(ct);
+            if (running.Any(r => string.Equals(r.InstanceId, instanceId, StringComparison.Ordinal)))
+            {
+                throw new InvalidOperationException("实例正在运行，请先停止游戏再删除。");
+            }
+        }
+
+        if (keepSaves && Directory.Exists(gameDir))
+        {
+            var exportRoot = Path.Combine(
+                _paths.ExportsDir, $"{instanceId}-{DateTimeOffset.Now:yyyyMMdd-HHmmss}");
+            foreach (var sub in new[] { "saves", "screenshots" })
+            {
+                var source = Path.Combine(gameDir, sub);
+                if (!Directory.Exists(source))
+                {
+                    continue;
+                }
+
+                var target = Path.Combine(exportRoot, sub);
+                Directory.CreateDirectory(exportRoot);
+                try
+                {
+                    Directory.Move(source, target);
+                }
+                catch (IOException)
+                {
+                    CopyDirectory(source, target);
+                    Directory.Delete(source, recursive: true);
+                }
+            }
+        }
+
+        // 只删除由本启动器管理的实例目录；外部接管与 shared/game 一律不动。
+        if (IsManagedInstanceDir(gameDir) && Directory.Exists(gameDir))
+        {
+            Directory.Delete(gameDir, recursive: true);
+        }
+
+        await _sqlite.DeleteInstanceAsync(instance.Id, ct);
+        _logger.LogInformation("实例已删除：{Instance}（keepSaves={KeepSaves}）", instanceId, keepSaves);
     }
 
-    public Task<IReadOnlyList<InstanceSummary>> ImportExternalAsync(
-        string path, IProgress<ImportProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现外部导入。");
+    public async Task<IReadOnlyList<InstanceSummary>> ImportExternalAsync(
+        string path, IProgress<ImportProgress> progress, CancellationToken ct)
+    {
+        var candidate = ExternalImporter.Detect(path);
+        progress.Report(new ImportProgress("detect", 0, 0, 0, candidate.SourceKind));
+        var instanceId = await ExternalImporter.CopyAsync(
+            candidate, _paths, candidate.Name, progress, ct);
+
+        var name = string.IsNullOrWhiteSpace(candidate.Name) ? instanceId : candidate.Name;
+        await _sqlite.UpsertInstanceAsync(
+            instanceId, name, Path.Combine(_paths.InstancesDir, instanceId),
+            candidate.GameVersion, candidate.Loader, candidate.LoaderVersion,
+            IsolationLevel.ModsConfig, InstanceState.Ready, ct: ct);
+
+        _logger.LogInformation("外部实例已导入：{Source} -> {Instance}", candidate.SourceKind, instanceId);
+        return
+        [
+            new InstanceSummary(
+                instanceId, name, candidate.GameVersion, candidate.Loader, candidate.LoaderVersion,
+                IsolationLevel.ModsConfig, InstanceState.Ready, null, null),
+        ];
+    }
+
+    private async Task<(InstanceSummary Instance, string GameDir)> FindInstanceAsync(
+        string instanceId, CancellationToken ct)
+    {
+        var instances = await _sqlite.GetInstancesAsync(ct);
+        var instance = instances.FirstOrDefault(i => i.Id == instanceId)
+            ?? throw new KeyNotFoundException($"实例不存在：{instanceId}");
+        return (instance, await ResolveGameDirAsync(instance, ct));
+    }
+
+    private async Task<string> ResolveGameDirAsync(InstanceSummary instance, CancellationToken ct)
+    {
+        var root = await _sqlite.GetRootPathAsync(instance.Id, ct);
+        if (!string.IsNullOrWhiteSpace(root))
+        {
+            return root;
+        }
+
+        return instance.Isolation == IsolationLevel.None
+            ? Path.Combine(_paths.SharedDir, "game")
+            : Path.Combine(_paths.InstancesDir, instance.Id);
+    }
+
+    private bool IsManagedInstanceDir(string path)
+    {
+        var root = Path.GetFullPath(_paths.InstancesDir)
+            .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(source, file);
+            var destination = Path.Combine(target, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination, overwrite: true);
+        }
+    }
 
     public Task UpdateSettingsAsync(AppSettingsPatch patch, CancellationToken ct)
     {
