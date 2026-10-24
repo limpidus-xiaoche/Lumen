@@ -1,19 +1,23 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="Launcher.App.MainWindow"
         Title="Lumen"
-        Width="1080"
-        Height="680"
-        MinWidth="960"
-        MinHeight="600"
+        Width="920"
+        Height="560"
+        MinWidth="800"
+        MinHeight="480"
         WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="52"
+        WindowDecorations="None"
         Background="{DynamicResource WindowBackground}">
   <Window.Styles>
     <!-- 账号区登录方式 pill（离线/正版）：选中项青色高亮 -->
     <Style Selector="RadioButton.mode-pill">
-      <Setter Property="Padding" Value="14,5" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Padding" Value="18,8" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="CornerRadius" Value="20" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
       <Setter Property="Template">
@@ -40,101 +44,149 @@
       <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+
+    <!-- 自定义标题栏窗口控制按钮 -->
+    <Style Selector="Button.win-btn">
+      <Setter Property="Width" Value="44" />
+      <Setter Property="Height" Value="52" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="{TemplateBinding Background}">
+              <ContentPresenter Content="{TemplateBinding Content}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="Button.win-btn:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+    </Style>
+    <Style Selector="Button.win-btn-close:pointerover">
+      <Setter Property="Background" Value="#C42B1C" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
   </Window.Styles>
 
-  <Grid ColumnDefinitions="228,*">
+  <Grid RowDefinitions="52,*">
 
-    <!-- 左侧导航栏（PCL2 风格：竖排大按钮） -->
-    <Border Grid.Column="0" Background="{DynamicResource SidebarBackground}">
+    <!-- 自定义标题栏（PCL2 风格：无系统标题栏，Logo 居左，账号区+关闭按钮居右） -->
+    <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
+            chrome:WindowDecorationProperties.ElementRole="TitleBar">
       <DockPanel>
 
-        <!-- 顶部：低调字标 -->
-        <StackPanel DockPanel.Dock="Top" Margin="20,22,20,8" Orientation="Horizontal" Spacing="10">
+        <!-- 左侧：作者标识（简洁两行：品牌 + 定位） -->
+        <StackPanel DockPanel.Dock="Left" Margin="16,0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <Border Width="14" Height="14" CornerRadius="3" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-          <TextBlock Text="Lumen" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+          <StackPanel VerticalAlignment="Center" Spacing="-2">
+            <TextBlock Text="麦谷Limpidus" FontSize="16" FontWeight="Bold"
+                       Foreground="{DynamicResource AccentGlow}" />
+            <TextBlock Text="启动器" FontSize="11" FontWeight="Medium"
+                       Foreground="{DynamicResource TextSecondary}" />
+          </StackPanel>
         </StackPanel>
 
-        <!-- 三大导航按钮：启动 / 下载 / 设置 -->
-        <ListBox DockPanel.Dock="Top"
-                 Margin="8,14,8,0"
-                 ItemsSource="{Binding Pages}"
-                 SelectedItem="{Binding SelectedPage}"
-                 Background="Transparent"
-                 BorderThickness="0">
-          <ListBox.ItemContainerTheme>
-            <ControlTheme TargetType="ListBoxItem">
-              <Setter Property="Padding" Value="18,13" />
-              <Setter Property="Margin" Value="2,3" />
-              <Setter Property="FontSize" Value="15" />
-              <Setter Property="CornerRadius" Value="10" />
-              <Setter Property="Background" Value="Transparent" />
-              <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
-              <Setter Property="Template">
-                <Setter.Value>
-                  <ControlTemplate TargetType="ListBoxItem">
-                    <Border Background="{TemplateBinding Background}"
-                            CornerRadius="{TemplateBinding CornerRadius}"
-                            Padding="{TemplateBinding Padding}"
-                            BorderBrush="{DynamicResource AccentBrush}"
-                            BorderThickness="0">
-                      <ContentPresenter Name="PART_ContentPresenter"
-                                        Content="{TemplateBinding Content}"
-                                        ContentTemplate="{TemplateBinding ContentTemplate}"
-                                        Foreground="{TemplateBinding Foreground}"
-                                        VerticalAlignment="Center" />
-                    </Border>
-                  </ControlTemplate>
-                </Setter.Value>
-              </Setter>
-              <Style Selector="^:pointerover">
-                <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
-              </Style>
-              <Style Selector="^:selected">
-                <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
-                <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-              </Style>
-            </ControlTheme>
-          </ListBox.ItemContainerTheme>
-          <ListBox.ItemTemplate>
-            <DataTemplate>
-              <TextBlock Text="{Binding Title}" />
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-
-        <!-- 底部：两位作者低调水印 -->
-        <StackPanel DockPanel.Dock="Bottom" Margin="20,0,20,16">
-          <TextBlock Text="麦谷 &amp; Limpidus"
-                     FontSize="11"
-                     Opacity="0.45"
-                     Foreground="{DynamicResource TextMuted}" />
-          <TextBlock Text="Lumen · MC Launcher"
-                     FontSize="9"
-                     Opacity="0.3"
-                     Foreground="{DynamicResource TextMuted}" />
+        <!-- 右侧：最小化 + 关闭按钮 -->
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="0">
+          <Button x:Name="BtnMin" Classes="win-btn" Content="─"
+                  chrome:WindowDecorationProperties.ElementRole="DecorationsElement" />
+          <Button x:Name="BtnClose" Classes="win-btn win-btn-close" Content="×"
+                  chrome:WindowDecorationProperties.ElementRole="DecorationsElement" />
         </StackPanel>
       </DockPanel>
     </Border>
 
-    <!-- 右侧内容区 -->
-    <Border Grid.Column="1" Background="{DynamicResource ContentBackground}">
-      <DockPanel>
+    <!-- 主区：左侧导航 + 右侧页面 -->
+    <Grid Grid.Row="1" ColumnDefinitions="220,*">
 
-        <!-- 顶部：账号区（PCL2 风格，右上角） -->
-        <Border DockPanel.Dock="Top" Padding="0,10,24,10"
-                BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="0,0,0,1">
-          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+      <!-- 左侧导航栏（PCL2 风格：竖排大按钮） -->
+      <Border Grid.Column="0" Background="{DynamicResource SidebarBackground}">
+        <DockPanel>
+          <!-- 三大导航按钮：启动 / 下载 / 设置 -->
+          <ListBox DockPanel.Dock="Top"
+                   Margin="8,18,8,0"
+                   ItemsSource="{Binding Pages}"
+                   SelectedItem="{Binding SelectedPage}"
+                   Background="Transparent"
+                   BorderThickness="0">
+            <ListBox.ItemContainerTheme>
+              <ControlTheme TargetType="ListBoxItem">
+                <Setter Property="Padding" Value="18,13" />
+                <Setter Property="Margin" Value="2,3" />
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                      <Border Background="{TemplateBinding Background}"
+                              CornerRadius="{TemplateBinding CornerRadius}"
+                              Padding="{TemplateBinding Padding}"
+                              BorderBrush="{DynamicResource AccentBrush}"
+                              BorderThickness="0">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          VerticalAlignment="Center" />
+                      </Border>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+                <Style Selector="^:pointerover">
+                  <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+                </Style>
+                <Style Selector="^:selected">
+                  <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+                  <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+                  <Setter Property="FontWeight" Value="SemiBold" />
+                </Style>
+              </ControlTheme>
+            </ListBox.ItemContainerTheme>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Title}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
 
-            <!-- 登录方式 pill（离线 / 正版） -->
-            <Border Background="{DynamicResource CardBackground}"
-                    CornerRadius="16"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    Padding="3"
-                    VerticalAlignment="Center">
-              <StackPanel Orientation="Horizontal" Spacing="2">
+          <!-- 底部：版本信息（低调，作者标识已上移） -->
+          <StackPanel DockPanel.Dock="Bottom" Margin="20,0,20,16">
+            <TextBlock Text="Lumen 0.1 · M0"
+                       FontSize="11"
+                       Opacity="0.45"
+                       Foreground="{DynamicResource TextMuted}" />
+          </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <!-- 右侧页面内容 -->
+      <Border Grid.Column="1" Background="{DynamicResource ContentBackground}">
+        <Grid>
+          <ContentControl Content="{Binding CurrentPage}" Margin="8" />
+
+          <!-- 右上角竖排账号区（PCL2 风格：pill + 大头像 + 用户名） -->
+          <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,18,0"
+                  Background="{DynamicResource CardBackground}"
+                  CornerRadius="16"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1"
+                  Padding="14,10">
+            <StackPanel Orientation="Vertical" Spacing="8">
+              <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
                 <RadioButton Classes="mode-pill" GroupName="AuthMode"
                              Content="离线"
                              IsChecked="{Binding Accounts.OfflineMode}" />
@@ -142,34 +194,23 @@
                              Content="正版"
                              IsChecked="{Binding Accounts.OnlineMode}" />
               </StackPanel>
-            </Border>
-
-            <!-- 皮肤头像 -->
-            <Border Width="52" Height="52" CornerRadius="7"
-                    Background="{DynamicResource CardBackground}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    VerticalAlignment="Center">
-              <Image Source="{Binding Accounts.Avatar}"
-                     RenderOptions.BitmapInterpolationMode="None"
-                     Stretch="UniformToFill" />
-            </Border>
-
-            <!-- 用户名 + 登录状态 -->
-            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Border Width="80" Height="80" CornerRadius="12"
+                      Background="{DynamicResource ContentBackground}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      BorderThickness="1"
+                      HorizontalAlignment="Center">
+                <Image Source="{Binding Accounts.Avatar}"
+                       RenderOptions.BitmapInterpolationMode="None"
+                       Stretch="UniformToFill" />
+              </Border>
               <TextBlock Text="{Binding Accounts.Username}"
-                         FontSize="15" FontWeight="SemiBold"
+                         FontSize="14" FontWeight="SemiBold"
+                         HorizontalAlignment="Center"
                          Foreground="{DynamicResource TextPrimary}" />
-              <TextBlock Text="{Binding Accounts.StatusText}"
-                         FontSize="11"
-                         Foreground="{DynamicResource TextMuted}" />
             </StackPanel>
-          </StackPanel>
-        </Border>
-
-        <!-- 页面内容 -->
-        <ContentControl Content="{Binding CurrentPage}" Margin="8" />
-      </DockPanel>
-    </Border>
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
   </Grid>
 </Window>
