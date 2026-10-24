@@ -165,6 +165,8 @@ tests/
 
 > **M0 例外（已确认，2026-10-24）**：`src/Launcher.App/**` 与 `tests/Launcher.App.Tests/**` 由 A 代搭最小脚手架（六页 + `FakeLauncherFacade` + 深色主题）。自 B 首次提交起，这些路径**只由 B 修改**，A 不再改动；B 可在 `feat/ui-m0` 上整体重写，无需保留现有 XAML/VM 结构。
 
+> **前端分工更新（2026-10-24）**：App 归属仍为 B；后续由 A 提供**最小基础模型**（页面骨架、绑定、数据接口），B 负责优化与设计定稿。A 只在 B 明确请求时修改 App，且以最小结构为主。
+
 ---
 
 ## 5. 接口契约（v0.5）
@@ -1012,3 +1014,4 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | v0.5 P0-8 lzma | §6.4（只取 raw / `E4003`）、§8.2 |
 | v0.5 P1 其余 | §5 DTO 字段、§5 `GetRunningSessionsAsync`、§9.0 hook 安装、§6.6 authlib pin、§12 发布形态、§12.1 CI 生成、§6.7 导入模式、§7.1 路径/GC、§10 M0 版本、§1 范围、§6.4 x64、§11 矩阵 |
 | M0 归属（2026-10-24） | §4（M0 例外）、§10 M0（B 接管项） | App 脚手架由 A 代搭，B 接管后只由 B 修改 |
+| M1（A）（2026-10-24） | §6.1（rules/合并）、§6.4（Java 探测）、§10 M1 | ManifestClient / VersionResolver / RuleEvaluator / JavaLocator；CLI versions/java/resolve |

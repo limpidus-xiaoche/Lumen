@@ -29,6 +29,8 @@
 - [x] **M0 完成**：解决方案 + Protocol/Core/App/CLI + SQLite v3 + 离线身份 + 六页 Avalonia 壳 + FakeLauncherFacade + 8 项测试 + pre-push hook 文件
   - **归属说明**：`src/Launcher.App/**` 与 `tests/Launcher.App.Tests/**` 由 **A 代搭最小脚手架**（六页 + Fake + 深色主题），由 **B 接管**；B 首次提交后 App 路径只由 B 修改。
 - [ ] B 接管 App：在 `feat/ui-m0` 分支确认或重写脚手架，并在提交信息中说明
+- [x] **M1（A）完成**：manifest（含 `latest` 解析）、version.json、rules、`inheritsFrom` 合并、Java 探测（32/64 注册表）
+- [ ] **M1（B）**：下载页版本列表、设置页 Java 列表（按“A 搭基础模型、B 优化”推进）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -111,7 +113,7 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | GUI 冒烟 | `Lumen.exe` 启动并保持运行；日志写入 `%LOCALAPPDATA%\Lumen\logs` |
 | 架构测试 | Core 不依赖 Avalonia / Hosting / DI |
 | pre-push hook | 文件已提交，待执行 `git config core.hooksPath .githooks` 启用 |
-| App 归属 | A 代搭脚手架，B 接管；后续 App 改动只由 B 提交 |
+| App 归属 | A 代搭脚手架；B 接管；后续基础模型由 A 提供、B 优化 |
 
 ## M1 验收结果（A 部分，2026-10-24）
 
@@ -210,4 +212,13 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 [2026-10-24] M0 App 归属确认：
              A 代搭 `src/Launcher.App` 与 `tests/Launcher.App.Tests` 的最小脚手架（六页 + Fake + 深色主题）；
              B 接管，可整体重写；自 B 首次提交起，App 路径只由 B 修改，A 不再改动。
+
+[2026-10-24] 前端策略更新：App 归属仍为 B；后续由 A 提供**最小基础模型**（页面骨架/绑定/数据接口），
+             B 负责优化与设计定稿；A 只在 B 明确请求时修改 App。
+
+[2026-10-24] M1（A）完成：
+             ManifestClient（官方 + BMCLAPI fallback + 15 分钟缓存，正确解析 latest.release/snapshot）；
+             VersionResolver（inheritsFrom 递归合并、库按 group:artifact 去重、参数拼接）；
+             RuleEvaluator（os.name/arch/version/features）；JavaLocator（JAVA_HOME/注册表 32+64/常见目录/PATH/内置 runtime）；
+             JavaVersionParser（release 优先、属性回退）；CLI 增加 versions / java / resolve；26 项测试通过。
 ```
