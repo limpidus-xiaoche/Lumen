@@ -8,12 +8,19 @@ using Launcher.Core.Java;
 using Launcher.Core.Launch;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
+using Launcher.Core.Update;
 using Launcher.Protocol;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-var launcherPaths = LauncherPaths.CreateDefault(LauncherPaths.IsPortableRequested(args));
+var launcherPaths = LauncherPaths.CreateDefault(
+    LauncherPaths.IsPortableRequested(args), out var portableFellBack);
 launcherPaths.EnsureCreated();
+if (portableFellBack)
+{
+    Console.Error.WriteLine(
+        $"警告：便携目录不可写，已回退到用户目录（{launcherPaths.LocalRoot}）。");
+}
 // 移除 --portable，避免 System.CommandLine 将其视为未知选项
 var cliArgs = args.Where(a => !string.Equals(a, "--portable", StringComparison.OrdinalIgnoreCase)).ToArray();
 var manifestClient = new ManifestClient(launcherPaths);
@@ -95,6 +102,11 @@ pathsCommand.SetAction(_ =>
 {
     Console.WriteLine($"config={launcherPaths.ConfigRoot}");
     Console.WriteLine($"local={launcherPaths.LocalRoot}");
+    Console.WriteLine($"portable={launcherPaths.IsPortable}");
+    if (launcherPaths.PortableFellBack)
+    {
+        Console.WriteLine("portable_fell_back=true");
+    }
 });
 
 var limitOption = new Option<int>("--limit")
@@ -672,6 +684,133 @@ logoutCommand.SetAction(result =>
     Console.WriteLine($"removed id={match.Id}");
 });
 
+var fullIntegrityOption = new Option<bool>("--full")
+{
+    Description = "全量逐文件校验（默认快校验）",
+};
+
+var integrityCommand = new Command("integrity", "校验自身文件完整性（§12.1）");
+integrityCommand.Options.Add(fullIntegrityOption);
+integrityCommand.SetAction(result =>
+{
+    var mode = result.GetValue(fullIntegrityOption)
+        ? IntegrityCheckMode.Full
+        : IntegrityCheckMode.Quick;
+    var report = facade.VerifyIntegrityAsync(mode, CancellationToken.None).GetAwaiter().GetResult();
+    Console.WriteLine($"valid={report.IsValid} mode={report.Mode} checked={report.CheckedFiles}");
+    Console.WriteLine(report.Message);
+    foreach (var failure in report.FailedFiles)
+    {
+        Console.WriteLine($"FAILED {failure}");
+    }
+
+    if (!report.IsValid)
+    {
+        Console.Error.WriteLine("E8002 完整性校验失败，拒绝自我替换，请重新安装。");
+        return 1;
+    }
+
+    return 0;
+});
+
+var channelOption = new Option<string>("--channel")
+{
+    Description = "更新通道（默认 win）",
+};
+var forceUpdateOption = new Option<bool>("--force")
+{
+    Description = "允许降级到清单版本",
+};
+
+var updateCheckCommand = new Command("check", "检查更新");
+updateCheckCommand.Options.Add(channelOption);
+updateCheckCommand.Options.Add(forceUpdateOption);
+updateCheckCommand.SetAction(result =>
+{
+    try
+    {
+        var info = facade.CheckUpdateAsync(
+            result.GetValue(channelOption), result.GetValue(forceUpdateOption),
+            CancellationToken.None).GetAwaiter().GetResult();
+        if (info is null)
+        {
+            Console.WriteLine("没有可用更新（已是最新版本或已拒绝降级）。");
+            return 0;
+        }
+
+        Console.WriteLine($"version={info.Version}");
+        Console.WriteLine($"size={info.Size}");
+        Console.WriteLine($"sha256={info.Sha256}");
+        Console.WriteLine($"url={info.Url}");
+        if (!string.IsNullOrWhiteSpace(info.Notes))
+        {
+            Console.WriteLine($"notes={info.Notes}");
+        }
+
+        return 0;
+    }
+    catch (UpdateException ex)
+    {
+        Console.Error.WriteLine($"E8001 {ex.Message}");
+        return 1;
+    }
+});
+
+var updateApplyCommand = new Command("apply", "下载、校验并应用更新");
+updateApplyCommand.Options.Add(channelOption);
+updateApplyCommand.Options.Add(forceUpdateOption);
+updateApplyCommand.SetAction(result =>
+{
+    try
+    {
+        var info = facade.CheckUpdateAsync(
+            result.GetValue(channelOption), result.GetValue(forceUpdateOption),
+            CancellationToken.None).GetAwaiter().GetResult();
+        if (info is null)
+        {
+            Console.WriteLine("没有可用更新。");
+            return 0;
+        }
+
+        var progress = new SyncProgress<UpdateProgress>(p =>
+            Console.WriteLine($"{p.Percent:F0}% {p.Message}"));
+        facade.ApplyUpdateAsync(info, progress, CancellationToken.None).GetAwaiter().GetResult();
+        Console.WriteLine($"update applied version={info.Version}");
+        return 0;
+    }
+    catch (IntegrityException ex)
+    {
+        Console.Error.WriteLine($"E8002 {ex.Message}");
+        return 1;
+    }
+    catch (UpdateException ex)
+    {
+        Console.Error.WriteLine($"E8001 {ex.Message}");
+        return 1;
+    }
+});
+
+var updateCommand = new Command("update", "自动更新（Velopack）");
+updateCommand.Subcommands.Add(updateCheckCommand);
+updateCommand.Subcommands.Add(updateApplyCommand);
+
+var diagnosticsInstanceOption = new Option<string>("--instance")
+{
+    Description = "附加指定实例的配置快照",
+};
+var diagnosticsCommand = new Command("diagnostics", "导出脱敏诊断包");
+diagnosticsCommand.Options.Add(diagnosticsInstanceOption);
+diagnosticsCommand.SetAction(result =>
+{
+    var instanceId = result.GetValue(diagnosticsInstanceOption);
+    var path = facade.ExportDiagnosticsAsync(instanceId, CancellationToken.None)
+        .GetAwaiter().GetResult();
+    Console.WriteLine(path);
+});
+
+root.Subcommands.Add(integrityCommand);
+root.Subcommands.Add(updateCommand);
+root.Subcommands.Add(diagnosticsCommand);
 root.Subcommands.Add(offlineUuid);
 root.Subcommands.Add(pathsCommand);
 root.Subcommands.Add(versionsCommand);

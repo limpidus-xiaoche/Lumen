@@ -1,12 +1,13 @@
-using System.IO.Compression;
 using Launcher.Core.Accounts;
 using Launcher.Core.Auth;
+using Launcher.Core.Diagnostics;
 using Launcher.Core.Install;
 using Launcher.Core.Instances;
 using Launcher.Core.Java;
 using Launcher.Core.Launch;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
+using Launcher.Core.Update;
 using Launcher.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -28,6 +29,9 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly AuthlibAuth? _authlib;
     private readonly LoaderCatalog? _loaderCatalog;
     private readonly ModpackInstaller? _modpackInstaller;
+    private readonly IntegrityService _integrity;
+    private readonly UpdateService _update;
+    private readonly DiagnosticsExporter _diagnostics;
 
     public LauncherFacade(
         LauncherPaths paths,
@@ -43,7 +47,10 @@ public sealed class LauncherFacade : ILauncherFacade
         MicrosoftAuth? microsoft = null,
         AuthlibAuth? authlib = null,
         LoaderCatalog? loaderCatalog = null,
-        ModpackInstaller? modpackInstaller = null)
+        ModpackInstaller? modpackInstaller = null,
+        IntegrityService? integrity = null,
+        UpdateService? updateService = null,
+        DiagnosticsExporter? diagnostics = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
@@ -59,6 +66,10 @@ public sealed class LauncherFacade : ILauncherFacade
         _authlib = authlib;
         _loaderCatalog = loaderCatalog;
         _modpackInstaller = modpackInstaller;
+        _integrity = integrity ?? new IntegrityService(paths);
+        _update = updateService ?? new UpdateService(paths, integrity: _integrity);
+        _diagnostics = diagnostics
+                       ?? new DiagnosticsExporter(paths, settingsStore, sqlite, javaLocator);
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
@@ -511,11 +522,28 @@ public sealed class LauncherFacade : ILauncherFacade
         return Task.CompletedTask;
     }
 
-    public Task<UpdateInfo?> CheckUpdateAsync(CancellationToken ct) =>
-        Task.FromResult<UpdateInfo?>(null);
+    public async Task<UpdateInfo?> CheckUpdateAsync(CancellationToken ct) =>
+        await _update.CheckAsync(ct: ct);
+
+    /// <summary>CLI 入口：指定通道与是否允许降级（不在 UI 契约内）。</summary>
+    public Task<UpdateInfo?> CheckUpdateAsync(string? channel, bool force, CancellationToken ct) =>
+        _update.CheckAsync(channel, force, ct);
 
     public Task ApplyUpdateAsync(UpdateInfo info, IProgress<UpdateProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现自动更新。");
+        _update.ApplyAsync(info, progress, ct);
+
+    public async Task<IntegrityReport> VerifyIntegrityAsync(IntegrityCheckMode mode, CancellationToken ct)
+    {
+        try
+        {
+            return await _integrity.VerifyAsync(mode, ct: ct);
+        }
+        catch (IntegrityException ex)
+        {
+            return new IntegrityReport(
+                false, mode, 0, ex.FailedFiles, ex.Message, DateTimeOffset.Now);
+        }
+    }
 
     public Task<IReadOnlyList<LogFileInfo>> GetLogFilesAsync(string? instanceId, CancellationToken ct)
     {
@@ -534,33 +562,6 @@ public sealed class LauncherFacade : ILauncherFacade
         return Task.FromResult<IReadOnlyList<LogFileInfo>>(files);
     }
 
-    public Task<string> ExportDiagnosticsAsync(string? instanceId, CancellationToken ct)
-    {
-        Directory.CreateDirectory(_paths.ExportsDir);
-        var output = Path.Combine(
-            _paths.ExportsDir,
-            $"diagnostics-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.zip");
-
-        using var archive = ZipFile.Open(output, ZipArchiveMode.Create);
-        AddEntryIfExists(archive, _paths.ConfigFile, "launcher.json");
-        foreach (var log in Directory.Exists(_paths.LogsDir)
-                     ? Directory.GetFiles(_paths.LogsDir, "*.log")
-                     : Array.Empty<string>())
-        {
-            AddEntryIfExists(archive, log, $"logs/{Path.GetFileName(log)}");
-        }
-
-        archive.CreateEntry("README.txt");
-        return Task.FromResult(output);
-    }
-
-    private static void AddEntryIfExists(ZipArchive archive, string path, string entryName)
-    {
-        if (!File.Exists(path))
-        {
-            return;
-        }
-
-        archive.CreateEntryFromFile(path, entryName, CompressionLevel.Optimal);
-    }
+    public Task<string> ExportDiagnosticsAsync(string? instanceId, CancellationToken ct) =>
+        _diagnostics.ExportAsync(instanceId, ct);
 }

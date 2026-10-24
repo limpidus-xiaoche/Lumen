@@ -156,6 +156,10 @@ public sealed class FakeLauncherFacade : ILauncherFacade
     public Task ApplyUpdateAsync(UpdateInfo info, IProgress<UpdateProgress> progress, CancellationToken ct) =>
         Task.CompletedTask;
 
+    public Task<IntegrityReport> VerifyIntegrityAsync(IntegrityCheckMode mode, CancellationToken ct) =>
+        Task.FromResult(new IntegrityReport(
+            true, mode, 2, Array.Empty<string>(), "假数据：校验通过。", DateTimeOffset.Now));
+
     public Task<IReadOnlyList<LogFileInfo>> GetLogFilesAsync(string? instanceId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<LogFileInfo>>(
             [new LogFileInfo(@"C:\Lumen\logs\launcher-20261024.log", null, LogKind.Launcher, 4096, DateTimeOffset.Now)]);

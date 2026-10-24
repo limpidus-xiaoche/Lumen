@@ -43,6 +43,8 @@
 - [ ] **M6（B）**：实例管理页、模组列表、导入向导、删除确认（B 负责）
 - [x] **M7（A）完成**：Modrinth / HMCL / MultiMC 整合包导入（CF 仅直链包）、清单依赖下载 + SHA1 校验、overrides 复制、CLI `modpack install`；实机验证 1.21.1 + Fabric 0.20.1 + Sodium 导入后可启动
 - [ ] **M7（B）**：拖拽导入、依赖确认、结果页（B 负责）
+- [x] **M8（A）完成**：`integrity.json` 快/全量校验（mtime 缓存，失败 E8002）、更新清单解析 + 流式 SHA-256 下载校验 + 版本单调（E8001）、诊断包脱敏导出、便携模式写探测与回退、CLI `integrity / update check|apply / diagnostics`、`scripts/pack.ps1` + `scripts/verify-integrity.ps1` + `.github/workflows/release.yml`（Velopack Setup.exe + Portable.zip，无 MSI）
+- [ ] **M8（B）**：更新入口、首次启动引导、白名单帮助页、日志轮转设置（B 负责）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -170,6 +172,42 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | 已知 | 1.21.1 命令行未超 24K，真实 argfile 启动未覆盖；Java 8 超长命令行未实现 wrapper（报 `E5003`） |
 
 > 离线账号的 Realms 认证会报 `Failed to parse into SignedJWT`，属于预期（没有正版 token），不影响本地游戏。
+
+## M7 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| 整合包格式 | Modrinth（`modrinth.index.json`）、HMCL（`modpack.json`）、MultiMC（`mmc-pack.json`）、CF 直链（`manifest.json`，仅 overrides，不调 CF API） |
+| 识别 | 按文件名写死，未知格式抛 `E3004` |
+| 安装 | 解析依赖（MC 版本 + 加载器/版本）→ 复用 Vanilla/加载器安装 → 下载清单文件（SHA1 校验）→ 复制 overrides |
+| 容错 | 无 SHA1 且非白名单直链**跳过**而非失败，避免单个坏文件阻断整包 |
+| CLI | `modpack install <path> [--name]`；`--portable` 在 `System.CommandLine` 之前预过滤 |
+| 测试 | **91 项通过**（Core 86 / App 4 / Integration 1） |
+| 实机 | Modrinth 目录包与 `.mrpack` 压缩包导入成功；Sodium 下载校验正确；overrides 复制正常；默认语言 `zh_cn` 生效；启动无错误 |
+| 构建 | 0 警告 / 0 错误 |
+
+> CurseForge 包只做 overrides 导入，不解析 `projectID/fileID` 依赖（§6.3.1 决策 C）。
+> B 部分（拖拽导入、依赖确认、结果页）尚未做。
+
+## M8 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| 完整性清单 | `integrity.json`（`version/algorithm/generatedAt/files[{path,size,sha256}]`），由 `pack.ps1` 在 CI/本地构建阶段生成 |
+| 快校验 | 只校验入口 exe + 清单本身；按「版本 + mtime 汇总」缓存到 `cache/integrity-check.json`，命中直接通过 |
+| 全量校验 | 逐文件 SHA-256；失败 `E8002` 立即拒绝运行/自我替换 |
+| 更新清单 | `releases.<channel>.json` 固定字段，未知字段忽略；缺 version/url/sha256/size 即 `E8001`；默认拒绝降级（`--force` 可越级） |
+| 更新包校验 | 先 size 后流式 SHA-256（`IncrementalHash`），不符重试 2 次后 `E8001` |
+| 更新源安全 | `UrlGuard`：仅 https + 443 + host 白名单，拒私网/环回 |
+| 诊断包 | `%LOCALAPPDATA%\Lumen\exports\diagnostics-*.zip`；排除 `accounts.dat`/`args.txt`/`.part.meta`；日志 token/Bearer/URL 凭据脱敏，用户目录替换 `%USERPROFILE%` |
+| 便携模式 | `--portable` 写探测 exe 同级 `data\`；不可写回退 `%LOCALAPPDATA%\Lumen` 并告警（`portable_fell_back=true`） |
+| 打包 | `pack.ps1`：publish(242 文件) → integrity 校验 → `vpk pack` → Setup.exe(68,433,392 B) + Portable.zip(60,918,322 B) + nupkg；断言无 MSI |
+| 实机 | `--portable integrity` 覆盖 1 个入口文件；`integrity --full` 覆盖 52 文件；同长度篡改 DLL → `E8002` exit 1；`update check` 无发布 → `E8001` HTTP 404；`diagnostics` 产出 6 条目 zip |
+| 测试 | **114 项通过**（Core 109 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+
+> 决策：Velopack 原生 feed 重命名为 `velopack.<channel>.json`，避免与 §12.1 固定字段的 `releases.<channel>.json` 冲突；Lumen 不消费 Velopack feed，直接按固定清单下载 Setup.exe 并校验后启动。
+> 未做：真实「旧版升级到新版」端到端流程（需先发布一个旧 tag）；更新 UI 属 B 部分。
 
 ## 目标样本
 
@@ -347,4 +385,28 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              硬约束：仅 App 层实现（Core 不做 UI 依赖）；首页可见才渲染；失焦/最小化停；GL 初始化延迟到首帧后；
              GL 不可用（RDP/软件渲染/ANGLE 失败）自动降级到 A；新增设置项 `Enable3DHero` 默认开、低配自动关。
              待实测：`CompositionVisual.TransformMatrix` 在 12.1.4 是否公开（决定真透视还是 2D 伪纵深）。
+
+[2026-10-24] M7（A）完成：
+             ModpackInstaller：按文件名识别 Modrinth/HMCL/MultiMC/CF 直链（未知 E3004）；
+             Parse 解析 MC 版本 + 加载器（Fabric/Forge/NeoForge）+ 文件清单（跳过 `env.client=unsupported`）；
+             InstallAsync 复用 Vanilla/加载器安装 → DownloadEngine 下载（SHA1 校验）→ overrides 复制 → 默认语言；
+             CF 包仅导入 overrides（不调 CF API）；无 SHA1 非白名单直链跳过；
+             LauncherFacade.InstallModpackAsync + CLI `modpack install`（`--portable` 前置过滤）；
+             UrlGuard 白名单补 BMCLAPI；13 项新测试（总计 91）；实机 Modrinth 目录包/.mrpack 导入 + Sodium 校验 + 启动通过。
+
+[2026-10-24] M8（A）完成：
+             IntegrityService：`integrity.json` 快校验（入口 exe + 清单，版本/mtime 缓存）/全量逐文件 SHA-256，失败 E8002 fail-closed；
+             UpdateService：`releases.win.json` 固定字段解析（未知字段忽略）+ 版本单调（降级需 --force）→ UrlGuard → 下载 `.part`
+             → 先 size 后流式 SHA-256（重试 2 次），失败 E8001；`.exe` 静默启动安装；
+             DiagnosticsExporter：系统/版本/设置/Java/实例/日志打包，排除 accounts.dat/args.txt/.part.meta，日志 token/Bearer/URL 凭据脱敏；
+             LauncherPaths：`--portable` 写探测 + 不可写回退 %LOCALAPPDATA% 并告警；CLI 新增 `integrity/update check|apply/diagnostics`；
+             App 首行 `VelopackApp.Build().Run()`；scripts/pack.ps1（publish→integrity→vpk pack→固定清单）+ verify-integrity.ps1 + release.yml；
+             实机：快校验 1 文件、全量 52 文件、同长度篡改 → E8002 exit 1、update check → E8001、diagnostics 6 条目；
+             打包产物 Setup.exe 68,433,392 B / Portable.zip 60,918,322 B / nupkg，无 MSI；114 项测试通过；0 警告 0 错误。
 ```
+
+## 待办（下一步）
+
+- 发布流程：先打一个旧版本 tag 走 `release.yml`，再做「旧版 → 新版」端到端升级实测（当前只验证了打包与校验链路）。
+- B 接管 `src/Launcher.App`：M2–M8 的 UI 部分（任务中心、实例卡片、账户页、安装向导、导入向导、更新入口、首次启动引导、日志轮转设置）。
+- 协作收尾：`ttss4096` 账号恢复后，把 deploy key 降为 CI 只读，开发者改用用户级 SSH key。

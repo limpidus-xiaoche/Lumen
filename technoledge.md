@@ -227,6 +227,7 @@ public interface ILauncherFacade
     // ---------- 更新 ----------
     Task<UpdateInfo?> CheckUpdateAsync(CancellationToken ct);
     Task ApplyUpdateAsync(UpdateInfo info, IProgress<UpdateProgress> progress, CancellationToken ct);
+    Task<IntegrityReport> VerifyIntegrityAsync(IntegrityCheckMode mode, CancellationToken ct);
 
     // ---------- 日志 / 诊断 ----------
     Task<IReadOnlyList<LogFileInfo>> GetLogFilesAsync(string? instanceId, CancellationToken ct);
@@ -328,7 +329,11 @@ public sealed record AppSettingsPatch(
 public sealed record LoaderVersionInfo(string Version, bool Stable, DateTimeOffset? ReleasedAt);
 public sealed record JavaRuntime(string Path, int MajorVersion, bool Is64Bit, string Vendor, string? VersionString);
 public sealed record UpdateInfo(string Version, string Notes, long Size, string Sha256, string Url);
+public sealed record IntegrityReport(bool IsValid, IntegrityCheckMode Mode, int CheckedFiles,
+    IReadOnlyList<string> FailedFiles, string Message, DateTimeOffset CheckedAt);
 public sealed record LogFileInfo(string Path, string? InstanceId, LogKind Kind, long Size, DateTimeOffset LastWriteAt);
+
+public enum IntegrityCheckMode { Quick, Full }   // Quick=入口 exe + 清单（带缓存）；Full=逐文件
 
 public enum TaskKind { Install, Repair, Modpack, Launch, Update, Import }
 public enum TaskState { Queued, Running, Paused, Succeeded, Failed, Cancelled }
@@ -562,6 +567,10 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 - **排除项（修订）**：`accounts.json`、`args.txt`、`.part.meta`、任何 token 字段。
 - 日志轮转：启动器日志单文件 20MB、保留 7 天、总量上限 200MB。
 - **崩溃现场独立保留**：`crash-reports/` 不参与日志轮转，每实例保留最近 10 份；清理策略单独实现，避免把需要分析的现场一起删掉。
+- **实现（A ✅ 2026-10-24）**：`DiagnosticsExporter.ExportAsync(instanceId)` → `%LOCALAPPDATA%\Lumen\exports\diagnostics-YYYYMMDD-HHmmss.zip`；
+  条目 `README.txt / version.json / system.json / settings.json / java.json / instances.json / logs/*.log`，指定实例时附 `instance/options.txt`；
+  排除 `accounts.dat`、`args.txt`、`*.part.meta`；日志先替换 `Bearer`、再替换 token/password/authorization 字段、最后替换 URL 内凭据，
+  用户目录统一替换为 `%USERPROFILE%`。CLI：`lumen diagnostics [--instance <id>]`。
 
 ### 6.9 扩展点（v2 预留，v1 不实现）
 
@@ -824,7 +833,10 @@ docs: 契约 v0.5
 
 ### M8 发布
 
-- `[A]` Velopack（Setup.exe + delta + Portable.zip）、诊断包、便携模式、**更新清单与自身完整性哈希清单（§12.1）**
+- `[A]` Velopack（Setup.exe + delta + Portable.zip）、诊断包、便携模式、**更新清单与自身完整性哈希清单（§12.1）** — **A ✅ 2026-10-24**
+  - 已落地：`IntegrityService`（快/全量 + `cache/integrity-check.json`）、`UpdateService`（清单解析 / 版本单调 / 流式 SHA-256 / 重试）、
+    `DiagnosticsExporter`、`LauncherPaths` 便携探测与回退、CLI `integrity / update check|apply / diagnostics`、
+    `scripts/pack.ps1` + `scripts/verify-integrity.ps1` + `.github/workflows/release.yml`（Velopack，无 MSI）。
 - `[B]` 更新入口、首次启动引导、白名单帮助页、日志轮转设置
 - **验收**：旧版可升级；诊断包可复现问题；无 MSI 产物；篡改更新清单/更新包/本地文件必须被拒绝（`E8001/E8002`）。
 
@@ -901,6 +913,15 @@ docs: 契约 v0.5
 5. 首次启动与更新页给"Windows 已保护你的电脑 → 更多信息 → 仍要运行"的图文引导；不在程序里自动改 Defender 排除项。
 6. **校验时机（P0-4）**：冷启动只校验 `Launcher.exe` 与清单本身，并按「程序版本 + 文件 mtime」缓存结果；全量哈希只在更新后首次启动或用户手动触发时执行，避免与 1.5s 启动预算冲突。
 7. **`integrity.json` 由 CI 生成（禁止手工）**：发布流水线在 `publish` 后对产物目录计算 SHA-256、生成清单并打进包；delta 包使用同一清单版本；workflow 必须校验「清单 ↔ 产物」一致，不一致直接失败。
+
+**实现落位（A ✅ 2026-10-24）**：
+
+- 代码：`Launcher.Core/Update/{IntegrityManifest,IntegrityService,IntegrityException}`、`{ReleaseManifest,UpdatePackageVerifier,UpdateService,UpdateException}`；协议 `Update/UpdateModels.cs`。
+- 快校验缓存：`%LOCALAPPDATA%\Lumen\cache\integrity-check.json`（`version + maxMtime + totalSize + mode`），全量通过后刷新；`DEBUG` 构建缺清单时跳过、`Release` fail-closed。
+- 清单基址默认 `https://github.com/limpidus-xiaoche/Lumen/releases/latest/download/releases.<channel>.json`，经 `UrlGuard` 校验后下载。
+- 打包：`scripts/pack.ps1`（publish → integrity.json → `verify-integrity.ps1` 正反向校验 → `vpk pack`）产出 `Lumen-win-Setup.exe`、`Lumen-win-Portable.zip`、`Lumen-<ver>-full.nupkg`、`assets.win.json`、`RELEASES`；断言无 `.msi`。
+- **命名冲突决策**：Velopack 原生 feed 改名为 `velopack.<channel>.json`，`releases.<channel>.json` 只放 §12.1 固定字段；Lumen 不消费 Velopack feed，直接按固定清单下载 Setup.exe 校验后静默启动。
+- 便携模式：`--portable` 检测 exe 同级 `data\` 可写（`FileOptions.DeleteOnClose` 探针），不可写回退 `%LOCALAPPDATA%\Lumen` 并在 CLI/日志告警。
 
 **安全边界（必须如实写进发布说明）**：
 
