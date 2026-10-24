@@ -407,6 +407,9 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 
 ## 待办（下一步）
 
+- **推送已恢复（2026-10-24）**：deploy key 无 workflow 权限，导致含 `.github/workflows/release.yml` 的提交被拒；
+  已生成用户级 ed25519 key（`~/.ssh/lumen_user_ed25519`）并加入账号 `mc-ttss4096`，owner 已加为 Write 协作者，
+  `feat/m8-core` 推送成功（SSH 身份 `Hi mc-ttss4096!`）。deploy key 保留作为后备，待账号稳定后降为 CI 只读。
 - 发布流程：先打一个旧版本 tag 走 `release.yml`，再做「旧版 → 新版」端到端升级实测（当前只验证了打包与校验链路）。
 - B 接管 `src/Launcher.App`：M2–M8 的 UI 部分（任务中心、实例卡片、账户页、安装向导、导入向导、更新入口、首次启动引导、日志轮转设置）。
-- 协作收尾：`ttss4096` 账号恢复后，把 deploy key 降为 CI 只读，开发者改用用户级 SSH key。
+- 协作收尾：`ttss4096` 账号恢复后，把 deploy key 降为 CI 只读；当前推送身份为 `mc-ttss4096`（用户级 SSH key）。
