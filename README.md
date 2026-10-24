@@ -86,6 +86,7 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 - HMCL：**Java + JavaFX** 应用；exe = `HMCLauncher.exe`(454KB 原生引导器) + 追加 ZIP(10.4MB, 4248 条目)，`Main-Class=org.jackhuang.hmcl.Main`。引导器负责找 Java（HMCL_JAVA_HOME/JAVA_HOME/注册表/bundled jre/下载 JDK）再拉起 JavaFX 主程序；内置 authlib-injector、lwjgl-unsafe-agent、MultiMC bootstrap、Terracotta。
 - VersePC：**Electron + 原生 JS 前端 + Node 业务后端**；`resources/app.asar` 133MB(2931 条目)，`main.js` 通过自定义协议 `versepc://` 加载 UI，业务全在 `server.js`(1.1MB)，另有 `agent-engine.js` 多模型 AI Agent、插件系统（modrinth/mod-dev-tools）、monaco/xterm/three.js。Forge 安装复用 `forge-installer.jar`（com.bangbang93.ForgeInstaller，与 PCL2 内嵌的同一个类）。
 - 签名现状（2026-10-24 用 `Get-AuthenticodeSignature` 复核）：三个样本 exe 全部 `NotSigned`；HMCL 另有**应用层**更新签名公钥 `assets/hmcl_signature_publickey.der`，PCL2 内置「Microsoft Defender 添加排除项」帮助文档——即行业普遍用"运行时引导 + 自身更新校验"替代 Authenticode。
+- PCL2 许可证（2026-10-24 核实 `Meloong-Git/PCL`）：**不是 MIT/Apache**，而是《PCL 分发有限许可》+《存储库合理使用指南》。"重度使用"（基于仓库修改，或参考大量内容重制启动/下载/Mod 管理等实质功能）要求：名称以 `Plain Craft Launcher (PCL)` 开头、关于页首位署名并附赞助链接、公开源码并沿用其指南、实现正版/赞助劝导、Windows 主色相必须为蓝色。**与本项目 MIT + `Lumen` 不兼容，结论：不 fork**。
 
 ## 取证产物
 
@@ -125,5 +126,9 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 [2026-10-24] 仓库已接通（写权限验证通过）：
              本地已 git init（main），首个提交 c2d2f65（README/technoledge/.gitignore/.gitattributes）；
              远程 origin = git@github.com:limpidus-xiaoche/Lumen.git，main 已推送并跟踪；
-             `_probe/` 已加入 .gitignore，不提交；提交身份为仓库级 ttss4096 <ttss4096@outlook.com>（未改全局）。
+              `_probe/` 已加入 .gitignore，不提交；提交身份为仓库级 ttss4096 <ttss4096@outlook.com>（未改全局）。
+
+[2026-10-24] 许可证核实（PCL2）：仓库采用《PCL 分发有限许可》+《合理使用指南》，非 MIT/Apache；
+             重度使用条款（PCL 开头命名/蓝色主色/署名+赞助/沿用指南）与本项目 MIT+Lumen 冲突；
+             结论：不 fork、不复制代码与资源；改为评估 CmlLib.Core（MIT）复用元数据/下载/启动原语。
 ```

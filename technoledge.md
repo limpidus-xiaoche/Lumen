@@ -59,6 +59,7 @@
 | 数据库 | Microsoft.Data.Sqlite（WAL） | |
 | 更新/分发 | **Velopack only**（`Setup.exe` + delta + `Portable.zip`） | 不再产出 MSI，避免两套安装器互相覆盖 |
 | 架构测试 | NetArchTest.Rules | 守护 §3 的三条规则 |
+| 复用库（可选） | **CmlLib.Core（MIT，M1 前评估）** | 只复用其元数据/下载/启动原语，接口仍由 `Launcher.Core` 定义；**不引入 PCL 源码** |
 | 代码签名 | **不做**（无 Authenticode，也无应用层公钥签名） | 决策已定；未签名发布，靠 HTTPS + SHA-256 + SmartScreen 引导 |
 | 完整性校验 | **SHA-256 清单**（自身 `integrity.json` + 更新清单 `sha256`） | v1 必做；安全边界见 §12.1 |
 
@@ -707,6 +708,8 @@ docs: 契约 v0.4
 - 许可证：本项目采用 **MIT**（根目录 `LICENSE`，版权行格式 `Copyright (c) 2026 <作者/组织>`，落 M0 前填写）；所有随包第三方组件必须与 MIT 兼容，不兼容者只能运行期下载/调用，并登记到 `THIRD_PARTY_NOTICES.md`。
 - 版本号 `主.次.修订`；tag `v0.x.y`；CHANGELOG 由 PR 标题汇总。
 - **Minecraft EULA 立场**：不分发 client jar / assets / 原版文件，全部从 Mojang 官方或镜像下载；离线模式仅限用户本地自用，不提供任何绕过正版验证的机制。
+- **PCL2 代码复用边界**：不 fork、不复制其代码/资源/帮助文本。其许可证为《PCL 分发有限许可》+《存储库合理使用指南》；「重度使用」（基于仓库修改，或参考大量内容重新实现启动/下载/Mod 管理等实质功能）要求：名称必须以 `Plain Craft Launcher (PCL)` 开头、关于页首位署名龙腾猫跃并附赞助链接、公开源码并沿用该指南、实现正版/赞助劝导、Windows 主色相必须为蓝色。以上与 MIT + `Lumen` + 自有 UI 不兼容，因此只借鉴**不受版权保护的交互思想与公开协议**。
+- **可复用库**：`CmlLib.Core`（MIT）可作为元数据/下载/启动原语的候选实现，接入方式由 `Launcher.Core` 的接口决定；引入前需复核其 LICENSE 与维护状态。
 - **第三方组件（新增：能下载就不打包）**
 
 | 组件 | 许可证（待复核） | 是否随包 | 用途 / 处理 |
@@ -722,6 +725,7 @@ docs: 契约 v0.4
 | Serilog（含 `Sinks.File`） | Apache-2.0 | 是 | 文件日志 |
 | System.CommandLine | MIT | 是 | CLI 解析 |
 | NetArchTest.Rules | MIT（待复核） | 否 | 仅测试 |
+| CmlLib.Core | MIT（已复核） | 待定 | M1 前评估；若引入仅作元数据/下载/启动原语 |
 
 > BCL 自带项（如 `Microsoft.Win32.Registry`）无需登记，但在 `THIRD_PARTY_NOTICES.md` 里要说明运行时依赖清单。
 
@@ -774,6 +778,8 @@ docs: 契约 v0.4
 | 15 | Forge ≤1.12.2 | 使用 `com.bangbang93.ForgeInstaller`；许可证核验为发布门禁 | 回退到 ≤1.12.2 官方 installer headless **未经验证**，需先做 spike；不可行则自研 `install_profile` 解析 |
 | 16 | CurseForge | **已定 C**：Modrinth/HMCL/MultiMC；CF 仅直链包 | M7 不验收 CF API 路线 |
 | 17 | GitHub 计划 | **Free**：分支保护不可用 → 约定 + pre-push hook + CI | CODEOWNERS 仅作 review 路由 |
+| 18 | 是否 fork PCL2 | **不 fork，也不复制其代码/资源** | 许可证为《PCL 分发有限许可》+ 合理使用指南；重度使用要求「PCL 开头命名 + 关于页署名 + 公开源码并沿用指南 + 正版/赞助劝导 + Windows 主色相蓝色」，与 MIT/Lumen 直接冲突 |
+| 19 | 避免重复造轮子 | M1 前评估 **CmlLib.Core（MIT）** 覆盖元数据/下载/启动原语；接口不变 | 不引入 PCL 代码；评估结论在 M1 前落文档 |
 
 ---
 
@@ -862,3 +868,4 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | v0.4 P1 一致性 | §6.3（Quilt/包文件名/依赖口径）、§4（Protocol 目录）、§2（NuGet/Serilog/CLI）、§7（WAL 备份/队列字段/权威）、§9.0（GitHub 计划）、§13-15 |
 | v0.4 P2 工程细节 | §6.7（None 目录）、§6.8（crash 保留）、§7（便携回退）、§8.2（i18n/E5003 内部）、§11（新增用例）、§12（组件表） |
 | v0.4 版本记账 | 头部、§2/§3/§5/§7/§10/§11/§15/§17 标题、§5 契约表 |
+| 补充：PCL2 许可核实 | §2（复用库）、§12（PCL2 边界 + 组件表）、§13-18/19 | 结论：不 fork；评估 CmlLib.Core（MIT） |
