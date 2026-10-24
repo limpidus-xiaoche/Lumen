@@ -102,8 +102,11 @@ public sealed class LauncherFacade : ILauncherFacade
             DiskUsageBytes: 0);
     }
 
-    public Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct) =>
-        Task.FromResult(_tasks.Snapshot());
+    public async Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct)
+    {
+        await _tasks.RestoreAsync(ct);
+        return _tasks.Snapshot();
+    }
 
     public Task CancelTaskAsync(string taskId, CancellationToken ct)
     {

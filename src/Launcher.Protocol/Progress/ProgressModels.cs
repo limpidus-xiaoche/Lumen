@@ -88,3 +88,10 @@ public sealed record TaskInfo(
     string Message,
     int Attempts,
     string? ErrorCode);
+
+/// <summary>任务错误码常量，UI 据此区分可重试与需修复。</summary>
+public static class TaskErrorCodes
+{
+    /// <summary>上次运行中断（重启恢复），重试无效，应执行修复。</summary>
+    public const string Interrupted = "E3004";
+}

@@ -43,7 +43,7 @@ var facade = new LauncherFacade(
     manifestClient,
     javaLocator,
     installer,
-    new TaskRegistry(),
+    new TaskRegistry(sqlite),
     launcher,
     loaderMetaClient);
 

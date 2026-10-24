@@ -29,6 +29,9 @@
     <DataTemplate DataType="vm:LogsViewModel">
       <views:LogsView />
     </DataTemplate>
+    <DataTemplate DataType="vm:TaskCenterViewModel">
+      <views:TaskCenterView />
+    </DataTemplate>
   </Application.DataTemplates>
 
   <!-- 双主题色板：界面所有颜色都从这里取，切换主题时全局自动换肤 -->

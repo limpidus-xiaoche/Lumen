@@ -31,7 +31,7 @@ public sealed class SqliteStore
               key TEXT PRIMARY KEY,
               value TEXT NOT NULL);
 
-            INSERT OR IGNORE INTO schema_meta(key, value) VALUES('version', '3');
+            INSERT OR REPLACE INTO schema_meta(key, value) VALUES('version', '4');
 
             CREATE TABLE IF NOT EXISTS instances(
               id TEXT PRIMARY KEY,
@@ -92,6 +92,18 @@ public sealed class SqliteStore
               detail TEXT,
               updated_at TEXT,
               PRIMARY KEY(instance_id, step));
+
+            CREATE TABLE IF NOT EXISTS tasks(
+              task_id TEXT PRIMARY KEY,
+              instance_id TEXT,
+              kind TEXT NOT NULL,
+              state TEXT NOT NULL,
+              percent REAL NOT NULL,
+              message TEXT NOT NULL,
+              attempts INTEGER NOT NULL DEFAULT 0,
+              error_code TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL);
             """, ct);
     }
 
@@ -237,6 +249,78 @@ public sealed class SqliteStore
         }
 
         return result;
+    }
+
+    public async Task SaveTaskAsync(TaskInfo task, CancellationToken ct = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO tasks(task_id, instance_id, kind, state, percent, message, attempts, error_code, created_at, updated_at)
+            VALUES($id, $instance, $kind, $state, $percent, $message, $attempts, $error, $created, $updated)
+            ON CONFLICT(task_id) DO UPDATE SET
+              state = excluded.state,
+              percent = excluded.percent,
+              message = excluded.message,
+              attempts = excluded.attempts,
+              error_code = excluded.error_code,
+              updated_at = excluded.updated_at;
+            """;
+        command.Parameters.AddWithValue("$id", task.TaskId);
+        command.Parameters.AddWithValue("$instance", (object?)task.InstanceId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$kind", task.Kind.ToString());
+        command.Parameters.AddWithValue("$state", task.State.ToString());
+        command.Parameters.AddWithValue("$percent", task.Percent);
+        command.Parameters.AddWithValue("$message", task.Message);
+        command.Parameters.AddWithValue("$attempts", task.Attempts);
+        command.Parameters.AddWithValue("$error", (object?)task.ErrorCode ?? DBNull.Value);
+        command.Parameters.AddWithValue("$created", DateTimeOffset.UtcNow.ToString("O"));
+        command.Parameters.AddWithValue("$updated", DateTimeOffset.UtcNow.ToString("O"));
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>按更新时间倒序读取最近的任务，用于任务中心重启恢复。</summary>
+    public async Task<IReadOnlyList<TaskInfo>> GetRecentTasksAsync(int limit, CancellationToken ct = default)
+    {
+        var result = new List<TaskInfo>();
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT task_id, instance_id, kind, state, percent, message, attempts, error_code
+            FROM tasks ORDER BY updated_at DESC LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", Math.Max(1, limit));
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            result.Add(new TaskInfo(
+                reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                Enum.TryParse<TaskKind>(reader.GetString(2), ignoreCase: true, out var kind) ? kind : TaskKind.Install,
+                Enum.TryParse<TaskState>(reader.GetString(3), ignoreCase: true, out var state) ? state : TaskState.Failed,
+                reader.GetDouble(4),
+                reader.GetString(5),
+                reader.GetInt32(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7)));
+        }
+
+        return result;
+    }
+
+    /// <summary>只保留最近 <paramref name="keep"/> 条任务记录，避免表无限增长。</summary>
+    public async Task PruneTasksAsync(int keep, CancellationToken ct = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            DELETE FROM tasks WHERE task_id NOT IN (
+              SELECT task_id FROM tasks ORDER BY updated_at DESC LIMIT $keep);
+            """;
+        command.Parameters.AddWithValue("$keep", Math.Max(1, keep));
+        await command.ExecuteNonQueryAsync(ct);
     }
 
     private static async Task ExecuteAsync(SqliteConnection connection, string sql, CancellationToken ct)
