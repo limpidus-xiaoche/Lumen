@@ -3,12 +3,19 @@
              x:Class="Launcher.App.Views.HomeView">
 
   <UserControl.Styles>
-    <!-- 超大启动按钮：暗紫底 + 紫色微光描边 -->
+    <!-- 超大启动按钮：亮紫渐变底 + 高亮紫色描边，从毛玻璃卡片中跳出 -->
     <Style Selector="Button.launch">
-      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
-      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-      <Setter Property="BorderThickness" Value="1.5" />
+      <Setter Property="Background">
+        <Setter.Value>
+          <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#6E48BE" Offset="0" />
+            <GradientStop Color="#482C85" Offset="1" />
+          </LinearGradientBrush>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="Foreground" Value="#F8F2FF" />
+      <Setter Property="BorderBrush" Value="#CFB2FF" />
+      <Setter Property="BorderThickness" Value="2" />
       <Setter Property="CornerRadius" Value="16" />
       <Setter Property="FontSize" Value="24" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -23,7 +30,7 @@
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="{TemplateBinding CornerRadius}"
-                    BoxShadow="0 0 26 0 #73A275F5">
+                    BoxShadow="0 0 34 0 #B38B5CF6">
               <ContentPresenter Content="{TemplateBinding Content}"
                                 Foreground="{TemplateBinding Foreground}"
                                 FontSize="{TemplateBinding FontSize}"
@@ -36,12 +43,12 @@
       </Setter>
     </Style>
     <Style Selector="Button.launch:pointerover">
-      <Setter Property="Background" Value="#3B2566" />
-      <Setter Property="Foreground" Value="#E3D3FF" />
+      <Setter Property="Background" Value="#7B52CC" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
     </Style>
     <Style Selector="Button.launch:pressed">
-      <Setter Property="Background" Value="#2E1F4D" />
-      <Setter Property="Opacity" Value="0.9" />
+      <Setter Property="Background" Value="#553591" />
+      <Setter Property="Opacity" Value="0.92" />
     </Style>
   </UserControl.Styles>
 
