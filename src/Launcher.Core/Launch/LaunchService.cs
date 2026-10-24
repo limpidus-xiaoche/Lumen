@@ -3,6 +3,7 @@ using System.Text;
 using Launcher.Core.Accounts;
 using Launcher.Core.Auth;
 using Launcher.Core.Game;
+using Launcher.Core.Install;
 using Launcher.Core.Java;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
@@ -65,7 +66,9 @@ public sealed class LaunchService
             throw new LaunchException("E3003", $"实例当前状态为 {instance.State}，请先修复");
         }
 
-        var detail = await _resolver.ResolveAsync(instance.VersionId, ct);
+        var effectiveVersionId = LoaderIds.EffectiveVersionId(
+            instance.VersionId, instance.Loader, instance.LoaderVersion);
+        var detail = await _resolver.ResolveAsync(effectiveVersionId, ct);
         var settings = _settings.Load();
         var java = SelectJava(detail, settings);
 

@@ -4,7 +4,7 @@
 
 | 项目代号 | **`Lumen`（已确认）** |
 |---|---|
-| 文档版本 | **v0.8** — M4（A）落地：账户存储 / 微软 Device Code / 外置登录；其余沿用 v0.7 |
+| 文档版本 | **v0.9** — M5（A）落地：Fabric / Forge 官方 installer / NeoForge 代码路径；其余沿用 v0.8 |
 | 日期 | 2026-10-24 |
 | 目标平台 | **v1 = Windows 10/11 x64 only**；跨平台列入 v2 非目标 |
 | 开发者 | A：核心（Core / CLI / 打包）　B：应用（Avalonia UI / 交互 / 生态页面） |
@@ -456,11 +456,11 @@ public enum DownloadSourceMode { Auto, Official, Mirror }
 | 加载器 | 机制 | 必需前置/坑 |
 |---|---|---|
 | Vanilla | client jar → libraries → natives → assets | ≤1.6 资源走 `virtual/legacy` |
-| Fabric / Quilt | loader JSON 合并为子版本 | **v1 只验收 Fabric**；Quilt 保留实现位、不进 v1 验收 |
-| Forge ≤1.12.2 | headless installer（`com.bangbang93.ForgeInstaller`） | 目标目录**必须先有 `launcher_profiles.json`**；已选定使用，许可证核验为发布门禁（§12） |
-| **Forge 1.13–1.16.5** | **官方 installer `--installClient`**：读 `install_profile.json`，先确保 vanilla client jar 存在，再执行 `processors`（含 `--add-opens`） | 比 1.12 更复杂：`processors` 失败常见于缺失 vanilla jar/Java 版本不符 |
-| Forge 1.17+ | bootstraplauncher + `-p` 模块路径 + `--add-opens/--add-exports` | 参数模板独立存放 |
-| NeoForge | 1.20.2+ 与 Forge 分道 | 版本号规则不同 |
+| Fabric | `loader/{game}/{loader}/profile/json` → 规范化 libraries 的 `downloads.artifact` → 子版本 JSON + 依赖库 | **v1 只验收 Fabric**；Quilt 保留实现位、不进 v1 验收。profile 的 `releaseTime` 可能为空串，反序列化按 null 处理 |
+| Forge（全版本） | **官方 installer `--installClient <shared>`**：先装 vanilla，再运行 installer；installer 自己处理 processors / bootstraplauncher / legacy universal | 目标目录**必须有 `launcher_profiles.json`**（缺失时自动写入最小文件）；允许 15 分钟超时；失败 `E3001` 并带安装器日志尾部 |
+| Forge ≤1.12.2 | 同上（installer `--installClient`） | **已放弃 `com.bangbang93.ForgeInstaller`**，避开未核实许可证；1.12.2 代码路径未真机验证（本机无 Java 8） |
+| NeoForge | 与 Forge 同一 installer 路径，版本号规则不同（1.20.2+） | 安装器与元数据均在 `maven.neoforged.net`；本机 DNS 被污染不可达，代码路径已实现但未真机验收 |
+| 加载器子版本 ID | `fabric-loader-{loader}-{game}` / `{game}-forge-{loader}` / `{game}-neoforge-{loader}` | 安装与启动共用 `LoaderIds`；installer 生成的非规范 ID 自动重命名归一 |
 | 整合包 | CurseForge `manifest.json`；Modrinth `modrinth.index.json`；HMCL `modpack.json`；MultiMC `mmc-pack.json` + `instance.cfg` | 文件名写死，禁止各方猜；**只补清单声明的依赖**，`mods.toml` 运行时依赖无法推导，M7 验收不要求 |
 
 ### 6.3.1 CurseForge 决策（已定：方案 C）
@@ -791,11 +791,14 @@ docs: 契约 v0.5
 - `[B]` 账户页、登录流程、换机后重新登录引导
 - **验收**：微软登录显示正版名；重启免登录；换机解密失败走重新登录；日志无明文 token。
 
-### M5 加载器
+### M5 加载器（A ✅ 2026-10-24；B 待做）
 
-- `[A]` Fabric / Forge（1.12 / 1.13–1.16.5 / 1.17+ 三套）/ NeoForge、`GetLoaderVersionsAsync`、变更加载器
+- `[A]` `LoaderCatalog`（Fabric meta / Forge maven+promotions / NeoForge maven）、`LoaderInstaller`（Fabric profile 合并、Forge/NeoForge 官方 installer）、`LoaderIds`、本地版本 JSON 解析、`UpdateInstanceAsync` 换加载器、CLI `loaders` / `install --loader`
 - `[B]` 安装向导（版本 + 加载器 + 加载器版本列表）
 - **验收**：三种加载器各装一个实例并成功启动。
+  - Fabric 1.21.1 + Loader 0.20.1：安装 + 启动通过（`Loading Minecraft 1.21.1 with Fabric Loader 0.20.1`，exit 0）
+  - Forge 1.20.1 + 47.4.28：安装 + 启动通过（`MinecraftForge v47.4.28 Initialized`，exit 0）
+  - NeoForge：本机 `maven.neoforged.net` DNS 被污染（解析到 Facebook IP），安装器无法下载 → 代码路径已实现，待正常网络补测
 
 ### M6 实例与模组
 
@@ -856,8 +859,7 @@ docs: 契约 v0.5
 | 组件 | 许可证（待复核） | 是否随包 | 用途 / 处理 |
 |---|---|---|---|
 | authlib-injector | AGPL-3.0 | **否** | 运行期下载 + SHA1；关于页附源码链接 |
-| `com.bangbang93.ForgeInstaller` | **未登记（发布门禁）** | **待定** | Forge ≤1.12.2；随包前必须核实许可证并登记 `THIRD_PARTY_NOTICES.md` |
-| Forge / NeoForge installer | LGPL-2.1（待复核） | **否** | 运行期从官方 maven 下载 |
+| Forge / NeoForge installer | LGPL-2.1（待复核） | **否** | 运行期从官方 maven 下载，不随包分发 |
 | Avalonia 12 | MIT | 是 | UI |
 | CommunityToolkit.Mvvm | MIT | 是 | MVVM |
 | Polly.Core | BSD-3-Clause | 是 | 韧性 |
@@ -917,7 +919,7 @@ docs: 契约 v0.5
 | 12 | 完整性 | SHA-256 清单 + fail-closed；残余风险：发布渠道被攻破 | 安全边界见 §12.1 |
 | 13 | 仓库 | GitHub 私有（Free 计划），SSH 公钥；保护降级为约定 + pre-push hook | 两人各持自己的公钥，仓库零密钥 |
 | 14 | 许可证 | 本项目 **MIT**；第三方不兼容则只运行期下载 | 需 `LICENSE` 与 `THIRD_PARTY_NOTICES.md` |
-| 15 | Forge ≤1.12.2 | 使用 `com.bangbang93.ForgeInstaller`；许可证核验为发布门禁 | 回退到 ≤1.12.2 官方 installer headless **未经验证**，需先做 spike；不可行则自研 `install_profile` 解析 |
+| 15 | Forge ≤1.12.2 | **改用官方 installer `--installClient`**（与 1.13+ 同一路径）；不再引入 `com.bangbang93.ForgeInstaller` | 官方 installer 对所有 Forge 版本均支持 headless；1.20.1 已真机验证，1.12.2 需 Java 8 环境补测 |
 | 16 | CurseForge | **已定 C**：Modrinth/HMCL/MultiMC；CF 仅直链包 | M7 不验收 CF API 路线 |
 | 17 | GitHub 计划 | **Free**：分支保护不可用 → 约定 + pre-push hook + CI | CODEOWNERS 仅作 review 路由 |
 | 18 | 是否 fork PCL2 | **不 fork，也不复制其代码/资源** | 许可证为《PCL 分发有限许可》+ 合理使用指南；重度使用要求「PCL 开头命名 + 关于页署名 + 公开源码并沿用指南 + 正版/赞助劝导 + Windows 主色相蓝色」，与 MIT/Lumen 直接冲突 |

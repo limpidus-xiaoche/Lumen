@@ -15,19 +15,28 @@ using Microsoft.Extensions.Logging.Abstractions;
 var launcherPaths = LauncherPaths.CreateDefault(LauncherPaths.IsPortableRequested(args));
 launcherPaths.EnsureCreated();
 var manifestClient = new ManifestClient(launcherPaths);
-var resolver = new VersionResolver(manifestClient);
+var resolver = new VersionResolver(manifestClient, launcherPaths);
 var javaLocator = new JavaLocator(launcherPaths);
 
 var settingsStore = new AppSettingsStore(launcherPaths);
 var sqlite = new SqliteStore(launcherPaths);
 sqlite.InitializeAsync().GetAwaiter().GetResult();
 var downloads = new DownloadEngine();
+var loaderCatalog = new LoaderCatalog();
+var loaderInstaller = new LoaderInstaller(
+    launcherPaths,
+    downloads,
+    resolver,
+    javaLocator,
+    settingsStore,
+    NullLogger<LoaderInstaller>.Instance);
 var installer = new VanillaInstaller(
     launcherPaths,
     resolver,
     downloads,
     sqlite,
-    NullLogger<VanillaInstaller>.Instance);
+    NullLogger<VanillaInstaller>.Instance,
+    loaderInstaller);
 var accounts = new AccountStore(launcherPaths);
 var microsoft = new MicrosoftAuth();
 var authlib = new AuthlibAuth();
@@ -54,7 +63,8 @@ var facade = new LauncherFacade(
     launcher,
     accounts,
     microsoft,
-    authlib);
+    authlib,
+    loaderCatalog);
 
 var root = new RootCommand("Lumen CLI");
 
@@ -155,12 +165,22 @@ var skipAssetsOption = new Option<bool>("--skip-assets")
 {
     Description = "跳过资源文件下载（仅用于快速验证）",
 };
+var installLoaderOption = new Option<string>("--loader")
+{
+    Description = "vanilla（默认）| fabric | forge | neoforge",
+};
+var installLoaderVersionOption = new Option<string>("--loader-version")
+{
+    Description = "加载器版本（非 vanilla 必填）",
+};
 
-var installCommand = new Command("install", "安装原版实例");
+var installCommand = new Command("install", "安装实例（原版或加载器）");
 installCommand.Arguments.Add(installVersionArgument);
 installCommand.Options.Add(installInstanceOption);
 installCommand.Options.Add(installNameOption);
 installCommand.Options.Add(skipAssetsOption);
+installCommand.Options.Add(installLoaderOption);
+installCommand.Options.Add(installLoaderVersionOption);
 installCommand.SetAction(result =>
 {
     var version = result.GetValue(installVersionArgument);
@@ -170,10 +190,26 @@ installCommand.SetAction(result =>
         return;
     }
 
+    var loaderText = (result.GetValue(installLoaderOption) ?? "vanilla").Trim().ToLowerInvariant();
+    var loader = loaderText switch
+    {
+        "vanilla" => LoaderKind.Vanilla,
+        "fabric" => LoaderKind.Fabric,
+        "forge" => LoaderKind.Forge,
+        "neoforge" => LoaderKind.NeoForge,
+        _ => throw new ArgumentException($"未知的加载器：{loaderText}"),
+    };
+    var loaderVersion = result.GetValue(installLoaderVersionOption);
+    if (loader != LoaderKind.Vanilla && string.IsNullOrWhiteSpace(loaderVersion))
+    {
+        Console.Error.WriteLine($"安装 {loader} 需要 --loader-version");
+        return;
+    }
+
     var instanceId = result.GetValue(installInstanceOption) ?? $"vanilla-{version}";
     var name = result.GetValue(installNameOption) ?? version;
     var request = new InstallRequest(
-        instanceId, name, version, LoaderKind.Vanilla, null,
+        instanceId, name, version, loader, loaderVersion,
         IsolationLevel.ModsConfig, InstallMode.New, result.GetValue(skipAssetsOption));
 
     var progress = new Progress<InstallProgress>(p =>
@@ -346,6 +382,60 @@ loginCommand.SetAction(result =>
     }
 });
 
+var loadersGameArgument = new Argument<string>("game")
+{
+    Description = "游戏版本，例如 1.21.1",
+};
+var loadersKindOption = new Option<string>("--loader")
+{
+    Description = "fabric | forge | neoforge（默认全部）",
+};
+var loadersLimitOption = new Option<int>("--limit")
+{
+    Description = "每种加载器最多显示 20 个版本",
+};
+
+var loadersCommand = new Command("loaders", "列出加载器版本");
+loadersCommand.Arguments.Add(loadersGameArgument);
+loadersCommand.Options.Add(loadersKindOption);
+loadersCommand.Options.Add(loadersLimitOption);
+loadersCommand.SetAction(result =>
+{
+    var game = result.GetValue(loadersGameArgument)
+        ?? throw new ArgumentException("缺少游戏版本");
+    var limit = result.GetValue(loadersLimitOption);
+    if (limit <= 0)
+    {
+        limit = 20;
+    }
+
+    var kindText = result.GetValue(loadersKindOption);
+    var kinds = string.IsNullOrWhiteSpace(kindText)
+        ? new[] { LoaderKind.Fabric, LoaderKind.Forge, LoaderKind.NeoForge }
+        : kindText.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(ParseLoader)
+            .Distinct()
+            .ToArray();
+
+    foreach (var kind in kinds)
+    {
+        try
+        {
+            var versions = facade.GetLoaderVersionsAsync(kind, game, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            Console.WriteLine($"# {kind} {game} ({versions.Count})");
+            foreach (var version in versions.Take(limit))
+            {
+                Console.WriteLine($"{version.Version}\t{(version.Stable ? "stable" : string.Empty)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"{kind}: {ex.Message}");
+        }
+    }
+});
+
 var instancesCommand = new Command("instances", "列出实例");
 instancesCommand.SetAction(_ =>
 {
@@ -432,6 +522,7 @@ root.Subcommands.Add(repairCommand);
 root.Subcommands.Add(launchCommand);
 root.Subcommands.Add(stopCommand);
 root.Subcommands.Add(sessionsCommand);
+root.Subcommands.Add(loadersCommand);
 root.Subcommands.Add(instancesCommand);
 root.Subcommands.Add(loginCommand);
 root.Subcommands.Add(accountsCommand);
@@ -439,6 +530,14 @@ root.Subcommands.Add(useCommand);
 root.Subcommands.Add(logoutCommand);
 
 return root.Parse(args).Invoke();
+
+static LoaderKind ParseLoader(string text) => text.Trim().ToLowerInvariant() switch
+{
+    "fabric" => LoaderKind.Fabric,
+    "forge" => LoaderKind.Forge,
+    "neoforge" => LoaderKind.NeoForge,
+    var other => throw new ArgumentException($"未知的加载器：{other}"),
+};
 
 static AccountSummary? FindAccount(LauncherSnapshot snapshot, string key) =>
     snapshot.Accounts.FirstOrDefault(a => a.Id == key)

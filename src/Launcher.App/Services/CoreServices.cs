@@ -37,15 +37,24 @@ public sealed class CoreServices
 
         var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
         var manifest = new ManifestClient(paths);
-        var resolver = new VersionResolver(manifest);
+        var resolver = new VersionResolver(manifest, paths);
         var javaLocator = new JavaLocator(paths);
         var downloads = new DownloadEngine();
+        var loaderCatalog = new LoaderCatalog();
+        var loaderInstaller = new LoaderInstaller(
+            paths,
+            downloads,
+            resolver,
+            javaLocator,
+            settings,
+            loggerFactory.CreateLogger<LoaderInstaller>());
         var installer = new VanillaInstaller(
             paths,
             resolver,
             downloads,
             sqlite,
-            loggerFactory.CreateLogger<VanillaInstaller>());
+            loggerFactory.CreateLogger<VanillaInstaller>(),
+            loaderInstaller);
         var accounts = new AccountStore(paths);
         var microsoft = new MicrosoftAuth();
         var authlib = new AuthlibAuth();
@@ -74,7 +83,8 @@ public sealed class CoreServices
             launcher,
             accounts,
             microsoft,
-            authlib);
+            authlib,
+            loaderCatalog);
 
         return new CoreServices(paths, facade);
     }

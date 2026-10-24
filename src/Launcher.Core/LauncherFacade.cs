@@ -25,6 +25,7 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly AccountStore? _accounts;
     private readonly MicrosoftAuth? _microsoft;
     private readonly AuthlibAuth? _authlib;
+    private readonly LoaderCatalog? _loaderCatalog;
 
     public LauncherFacade(
         LauncherPaths paths,
@@ -38,7 +39,8 @@ public sealed class LauncherFacade : ILauncherFacade
         LaunchService? launcher = null,
         AccountStore? accounts = null,
         MicrosoftAuth? microsoft = null,
-        AuthlibAuth? authlib = null)
+        AuthlibAuth? authlib = null,
+        LoaderCatalog? loaderCatalog = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
@@ -52,6 +54,7 @@ public sealed class LauncherFacade : ILauncherFacade
         _accounts = accounts;
         _microsoft = microsoft;
         _authlib = authlib;
+        _loaderCatalog = loaderCatalog;
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
@@ -81,8 +84,15 @@ public sealed class LauncherFacade : ILauncherFacade
     }
 
     public Task<IReadOnlyList<LoaderVersionInfo>> GetLoaderVersionsAsync(
-        LoaderKind loader, string gameVersion, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<LoaderVersionInfo>>(Array.Empty<LoaderVersionInfo>());
+        LoaderKind loader, string gameVersion, CancellationToken ct)
+    {
+        if (_loaderCatalog is null)
+        {
+            return Task.FromResult<IReadOnlyList<LoaderVersionInfo>>(Array.Empty<LoaderVersionInfo>());
+        }
+
+        return _loaderCatalog.GetVersionsAsync(loader, gameVersion, ct);
+    }
 
     public async Task<InstanceDetail> GetInstanceAsync(string instanceId, CancellationToken ct)
     {
@@ -168,9 +178,30 @@ public sealed class LauncherFacade : ILauncherFacade
         InstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
         _installer!.InstallAsync(request, progress, ct);
 
-    public Task UpdateInstanceAsync(
-        string instanceId, UpdateInstanceRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M2 未实现实例更新。");
+    public async Task UpdateInstanceAsync(
+        string instanceId, UpdateInstanceRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        var instances = await _sqlite.GetInstancesAsync(ct);
+        var current = instances.FirstOrDefault(i => i.Id == instanceId)
+            ?? throw new KeyNotFoundException($"实例不存在：{instanceId}");
+
+        if (request.MemoryMb is { } memoryMb)
+        {
+            var settings = _settingsStore.Load();
+            _settingsStore.Save(settings with { MaxMemoryMb = memoryMb });
+        }
+
+        var install = new InstallRequest(
+            instanceId,
+            request.DisplayName ?? current.Name,
+            request.VersionId ?? current.VersionId,
+            request.Loader ?? current.Loader,
+            request.LoaderVersion ?? current.LoaderVersion,
+            request.Isolation ?? current.Isolation,
+            InstallMode.ChangeLoader);
+
+        await InstallAsync(install, progress, ct);
+    }
 
     public async Task RepairInstanceAsync(
         string instanceId, IProgress<InstallProgress> progress, CancellationToken ct)

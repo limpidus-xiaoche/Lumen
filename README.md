@@ -37,6 +37,8 @@
 - [ ] **M3（B）**：实例卡片、启动按钮、实时日志、历史日志（B 负责）
 - [x] **M4（A）完成**：账户存储（DPAPI 整文件加密）、微软 Device Code + 自动刷新、authlib-injector 外置登录、启动凭据注入、CLI `login/accounts/use/logout/instances`
 - [ ] **M4（B）**：账户页、登录流程、换机后重新登录引导（B 负责）
+- [x] **M5（A）完成**：加载器版本清单（Fabric/Forge/NeoForge）、Fabric profile 合并安装、Forge/NeoForge 官方 installer headless 安装、本地版本解析、换加载器、CLI `loaders` / `install --loader`
+- [ ] **M5（B）**：安装向导（版本 + 加载器 + 加载器版本列表）（B 负责）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -300,4 +302,17 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              浏览器实测：Device Code `J37CG3BA` → 微软账号 `tzlleo` 登录成功，账户落盘并设为激活；
              新进程执行 `accounts` 仍可见（重启免登录）；`launch test-1.21.1` 日志 `Setting user: tzlleo`，
              Graceful 停止 exit 0。外置/离线启动不受影响。
+
+[2026-10-24] M5（A）完成：
+             LoaderCatalog：Fabric meta（loader/{game}/{loader}/profile/json）、Forge maven-metadata + promotions_slim、
+             NeoForge maven-metadata；版本号数值排序与 NeoForge 前缀映射（1.21.1→21.1）。
+             LoaderInstaller：Fabric profile 规范化 libraries 后写子版本 JSON 并下载依赖；
+             Forge/NeoForge 下载官方 installer（附 .sha1 校验）后执行 `--installClient <shared>`，
+             installer 自行处理 processors / bootstraplauncher；非规范版本 ID 自动归一。
+             VersionResolver 优先读本地 versions（加载器子版本），LaunchService 按 LoaderIds 解析并复用原版 client jar。
+             CLI 新增 `loaders`，`install` 支持 `--loader/--loader-version`；`UpdateInstanceAsync` 支持换加载器。
+             测试增至 70 项（新增 LoaderIds / 版本清单解析 / 本地继承合并 / 空 releaseTime 容错）。
+             真机：Fabric 1.21.1 + 0.20.1 安装并启动成功；Forge 1.20.1 + 47.4.28 安装并启动成功（MinecraftForge v47.4.28），
+             均 Graceful 停止 exit 0。NeoForge：本机 maven.neoforged.net DNS 被污染（解析到 Facebook IP），
+             安装器无法下载，代码路径已实现但未真机验收。放弃 bangbang93.ForgeInstaller，统一走官方 installer。
 ```

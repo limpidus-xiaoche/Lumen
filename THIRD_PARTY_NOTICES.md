@@ -19,8 +19,7 @@
 | 组件 | 许可证（待复核） | 用途 |
 |---|---|---|
 | authlib-injector | AGPL-3.0 | 外置登录；仅运行期下载并校验 SHA1，附源码链接 |
-| Forge / NeoForge installer | LGPL-2.1（待复核） | 加载器安装；运行期从官方 maven 下载 |
-| com.bangbang93.ForgeInstaller | 未登记（发布门禁） | Forge ≤1.12.2；随包前必须核实许可证 |
+| Forge / NeoForge installer | LGPL-2.1（待复核） | 加载器安装；**运行期**从官方 maven 下载，不随包分发 |
 
 ## 仅开发/测试
 
