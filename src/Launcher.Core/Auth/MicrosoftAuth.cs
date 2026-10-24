@@ -17,10 +17,15 @@ public sealed record MicrosoftLoginResult(
 
 public sealed class MicrosoftAuth
 {
+    /// <summary>
+    /// 微软 Live Connect（v1）公共客户端 ID。该 ID 只对 <c>login.live.com</c> 的 v1 端点有效，
+    /// 不能用于 Azure AD v2 的 <c>consumers/oauth2/v2.0</c> 端点（否则返回 AADSTS700016）。
+    /// </summary>
     public const string ClientId = "00000000402b5328";
-    private const string Scope = "XboxLive.signin offline_access";
-    private const string DeviceCodeUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
-    private const string TokenUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+
+    private const string Scope = "service::user.auth.xboxlive.com::MBI_SSL";
+    private const string DeviceCodeUrl = "https://login.live.com/oauth20_connect.srf";
+    private const string TokenUrl = "https://login.live.com/oauth20_token.srf";
     private const string XboxAuthUrl = "https://user.auth.xboxlive.com/user/authenticate";
     private const string XstsUrl = "https://xsts.auth.xboxlive.com/xsts/authorize";
     private const string McLoginUrl = "https://api.minecraftservices.com/authentication/login_with_xbox";
@@ -48,11 +53,12 @@ public sealed class MicrosoftAuth
         IProgress<LoginEvent> progress, CancellationToken ct)
     {
         var device = await RequestDeviceCodeAsync(ct);
+        var verification = device.VerificationUri ?? device.VerificationUrl ?? "https://www.microsoft.com/link";
         progress.Report(new LoginEvent(
             LoginEventKind.DeviceCode,
-            device.Message ?? "请在浏览器中完成 Microsoft 登录",
+            device.Message ?? $"请在浏览器打开 {verification} 并输入代码 {device.UserCode}",
             device.UserCode,
-            device.VerificationUri ?? device.VerificationUrl));
+            verification));
 
         var token = await PollAsync(device, progress, ct);
         return await CompleteAsync(token, ct);
@@ -81,6 +87,7 @@ public sealed class MicrosoftAuth
         {
             ["client_id"] = ClientId,
             ["scope"] = Scope,
+            ["response_type"] = "device_code",
         }, ct);
 
     private async Task<TokenResponse> PollAsync(
@@ -98,6 +105,7 @@ public sealed class MicrosoftAuth
                 ["client_id"] = ClientId,
                 ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code",
                 ["device_code"] = device.DeviceCode,
+                ["scope"] = Scope,
             }, ct);
 
             var token = JsonSerializer.Deserialize<TokenResponse>(text, JsonOptions) ?? new TokenResponse();
@@ -131,7 +139,8 @@ public sealed class MicrosoftAuth
             {
                 AuthMethod = "RPS",
                 SiteName = "user.auth.xboxlive.com",
-                RpsTicket = $"d={token.AccessToken}",
+                // v1 Live Connect 的 MBI_SSL token 本身就是 RPS ticket，不能再加 d= 前缀。
+                RpsTicket = token.AccessToken,
             },
             RelyingParty = "http://auth.xboxlive.com",
             TokenType = "JWT",

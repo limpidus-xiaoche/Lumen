@@ -291,4 +291,13 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              ArgumentBuilder 额外 JVM 参数改为列表，支持含空格路径；
              62 项测试通过（Core 57 / App 4 / Integration 1）；实机以离线账户 Tester 启动 1.21.1，日志显示
              "Setting user: Tester"，Graceful 停止 exit 0。微软网页授权与外置服务器登录未做真机验证（需用户凭据）。
+
+[2026-10-24] M4 微软登录真机验证 + 端点修正：
+             首次用 `login.microsoftonline.com/consumers/oauth2/v2.0/devicecode` 返回 AADSTS700016——
+             `00000000402b5328` 是 Live Connect **v1** 客户端 ID，不能用于 v2；已改为
+             `login.live.com/oauth20_connect.srf` + `oauth20_token.srf`，scope `MBI_SSL`，
+             XBL `RpsTicket` 改为原始 token（去掉 `d=` 前缀）。
+             浏览器实测：Device Code `J37CG3BA` → 微软账号 `tzlleo` 登录成功，账户落盘并设为激活；
+             新进程执行 `accounts` 仍可见（重启免登录）；`launch test-1.21.1` 日志 `Setting user: tzlleo`，
+             Graceful 停止 exit 0。外置/离线启动不受影响。
 ```

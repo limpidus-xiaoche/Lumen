@@ -520,6 +520,9 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
   - **便携模式换机后果（明确写死）**：DPAPI 密钥与用户/机器绑定，拷贝到另一台机器后 `Unprotect` 必然失败 → 视为 token 失效，提示重新登录，**绝不回退明文**。
 - 离线：`UUIDv3(md5("OfflinePlayer:"+name))`；token 生成合法 JWT 形状。
 - 微软：Device Code → live token → XBL → XSTS → Minecraft；token 加密存储、自动刷新。
+  - **端点必须用 v1 Live Connect**：`login.live.com/oauth20_connect.srf`（取 code）与 `login.live.com/oauth20_token.srf`（轮询/刷新），scope `service::user.auth.xboxlive.com::MBI_SSL`。
+  - `00000000402b5328` 是 v1 公共客户端 ID，**不能**用于 `login.microsoftonline.com/consumers/oauth2/v2.0/*`（会返回 `AADSTS700016`）。
+  - MBI_SSL 的 access_token 本身就是 XBL 的 RPS ticket，`RpsTicket` **不加 `d=` 前缀**；加了会被 XBL 以 401 拒绝。
 - 外置：authlib-injector **运行期下载并校验 SHA1**（不随包分发，见 §12），`-javaagent:...=地址`。
   - **SHA1 基准来源**：内置「版本 → SHA1」pin 表（随应用发布更新），只接受表内版本；表外版本一律拒绝（`E6003`）。禁止信任远端返回的 hash。
 - **账户存储（M4 落地）**：`%LOCALAPPDATA%\Lumen\accounts.dat`，整文件 DPAPI（CurrentUser）加密，内含 `accounts[] + active_id`。

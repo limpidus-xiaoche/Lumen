@@ -67,15 +67,15 @@ public sealed class MicrosoftAuthTests
         {
             var url = request.RequestUri!.ToString();
 
-            if (url.Contains("devicecode", StringComparison.Ordinal))
+            if (url.Contains("oauth20_connect", StringComparison.Ordinal))
             {
                 return Json("""
-                    {"device_code":"dc","user_code":"ABCD1234","verification_uri":"https://microsoft.com/link",
-                     "expires_in":600,"interval":1,"message":"请在浏览器中登录"}
+                    {"device_code":"dc","user_code":"ABCD1234","verification_uri":"https://www.microsoft.com/link",
+                     "expires_in":600,"interval":1}
                     """);
             }
 
-            if (url.Contains("/token", StringComparison.Ordinal))
+            if (url.Contains("oauth20_token", StringComparison.Ordinal))
             {
                 var body = request.Content is null
                     ? string.Empty

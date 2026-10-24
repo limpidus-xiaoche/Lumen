@@ -32,6 +32,7 @@ public static class UrlGuard
         "api.github.com",
         "objects.githubusercontent.com",
         "raw.githubusercontent.com",
+        "login.live.com",
         "login.microsoftonline.com",
         "user.auth.xboxlive.com",
         "xsts.auth.xboxlive.com",
