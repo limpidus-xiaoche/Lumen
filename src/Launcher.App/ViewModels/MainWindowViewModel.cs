@@ -22,7 +22,7 @@ public partial class MainWindowViewModel : ObservableObject
         [
             new NavItem("首页", new HomeViewModel(facade)),
             new NavItem("实例", new InstancesViewModel(facade)),
-            new NavItem("下载", new DownloadViewModel()),
+            new NavItem("下载", new DownloadViewModel(facade)),
             new NavItem("账户", new AccountsViewModel(facade)),
             new NavItem("设置", new SettingsViewModel(facade)),
             new NavItem("日志", new LogsViewModel(facade)),

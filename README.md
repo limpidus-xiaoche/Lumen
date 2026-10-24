@@ -30,7 +30,7 @@
   - **归属说明**：`src/Launcher.App/**` 与 `tests/Launcher.App.Tests/**` 由 **A 代搭最小脚手架**（六页 + Fake + 深色主题），由 **B 接管**；B 首次提交后 App 路径只由 B 修改。
 - [ ] B 接管 App：在 `feat/ui-m0` 分支确认或重写脚手架，并在提交信息中说明
 - [x] **M1（A）完成**：manifest（含 `latest` 解析）、version.json、rules、`inheritsFrom` 合并、Java 探测（32/64 注册表）
-- [ ] **M1（B）**：下载页版本列表、设置页 Java 列表（按“A 搭基础模型、B 优化”推进）
+- [x] **M1（B）基础模型**：下载页接真实 manifest 列表、设置页接真实 Java 列表；B 负责优化定稿
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -122,10 +122,12 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | `versions --limit 5` | `latest_release=26.3` / `latest_snapshot=26.4-snapshot-5`，清单解析正确 |
 | `resolve 1.21.1` | mainClass `net.minecraft.client.main.Main`；97 个库；28 game args；11 jvm args；assetIndex 17 |
 | `java` | 检出 6 个 JDK（Oracle 25/21、Temurin 21/17、Microsoft 21，全部 x64） |
-| 测试 | **26 项通过**（Core 23 / App 2 / Integration 1） |
+| 测试 | **28 项通过**（Core 23 / App 4 / Integration 1） |
 | 构建 | 0 警告 / 0 错误 |
+| 前端基础模型 | 下载页接 `RefreshManifestAsync`（真实版本列表）；设置页接 `GetSnapshotAsync`（Java 列表）；App 启动使用真实 `LauncherFacade` |
+| GUI 冒烟（真实 Core） | `Lumen.exe` 启动，SQLite 初始化成功，日志无错误 |
 
-> B 部分（下载页版本列表、设置页 Java 列表）尚未做；按最新约定，由 A 提供最小基础模型、B 负责优化定稿。
+> B 部分只做了基础模型（数据绑定 + 列表），视觉与交互仍由 B 优化定稿。
 
 ## 目标样本
 
@@ -221,4 +223,9 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              VersionResolver（inheritsFrom 递归合并、库按 group:artifact 去重、参数拼接）；
              RuleEvaluator（os.name/arch/version/features）；JavaLocator（JAVA_HOME/注册表 32+64/常见目录/PATH/内置 runtime）；
              JavaVersionParser（release 优先、属性回退）；CLI 增加 versions / java / resolve；26 项测试通过。
+
+[2026-10-24] M1 前端基础模型：
+             App 改用真实 LauncherFacade（CoreServices 组装路径/设置/SQLite/manifest/Java）；
+             下载页加载 manifest 并列出真实版本；设置页加载并显示本机 Java；
+             新增 2 项 ViewModel 测试（总计 28 项）；视觉与交互待 B 优化。
 ```

@@ -4,12 +4,21 @@
   <StackPanel Margin="28" Spacing="12">
     <TextBlock Text="下载" FontSize="26" FontWeight="Bold" />
     <TextBlock Text="{Binding StatusText}" />
-    <ItemsControl ItemsSource="{Binding Versions}">
-      <ItemsControl.ItemTemplate>
-        <DataTemplate>
-          <TextBlock Text="{Binding}" Padding="0,4" />
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
+    <TextBlock Text="{Binding LatestRelease, StringFormat='最新正式版：{0}'}" Opacity="0.7" />
+    <Button Content="加载版本列表" Command="{Binding LoadCommand}" />
+    <ScrollViewer Height="420">
+      <ItemsControl ItemsSource="{Binding Versions}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Padding="12" Margin="0,3" Background="#1B1E26" CornerRadius="6">
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{Binding Id}" FontWeight="SemiBold" Width="220" />
+                <TextBlock Text="{Binding Type}" Opacity="0.6" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
   </StackPanel>
 </UserControl>

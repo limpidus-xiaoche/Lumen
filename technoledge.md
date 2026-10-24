@@ -755,7 +755,7 @@ docs: 契约 v0.5
 - `[B]` **接管 App 脚手架**：在 `feat/ui-m0` 上确认或重写六页结构、主题与 Fake 数据；首次提交即视为验收
 - **验收**：两人 build 绿；六页可切换；架构测试通过；离线身份可生成；hook 生效（直推 main 被本地拒绝）；B 已接管 App 归属。
 
-### M1 元数据 + Java（A 部分 ✅ 2026-10-24；B 部分待做）
+### M1 元数据 + Java（A ✅ 2026-10-24；B 基础模型 ✅，待 B 优化定稿）
 
 - `[A]` manifest、version.json、规则判定、继承合并、`JavaLocator`（含 32/64 注册表视图）
 - `[B]` 下载页版本列表、设置页 Java 列表
@@ -1015,3 +1015,4 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | v0.5 P1 其余 | §5 DTO 字段、§5 `GetRunningSessionsAsync`、§9.0 hook 安装、§6.6 authlib pin、§12 发布形态、§12.1 CI 生成、§6.7 导入模式、§7.1 路径/GC、§10 M0 版本、§1 范围、§6.4 x64、§11 矩阵 |
 | M0 归属（2026-10-24） | §4（M0 例外）、§10 M0（B 接管项） | App 脚手架由 A 代搭，B 接管后只由 B 修改 |
 | M1（A）（2026-10-24） | §6.1（rules/合并）、§6.4（Java 探测）、§10 M1 | ManifestClient / VersionResolver / RuleEvaluator / JavaLocator；CLI versions/java/resolve |
+| M1 前端基础模型（2026-10-24） | §4（前端分工）、§10 M1 | 下载页真实 manifest 列表、设置页 Java 列表；App 接真实 `LauncherFacade`；B 负责优化 |

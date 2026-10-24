@@ -2,7 +2,10 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Launcher.App.Mock;
+using Launcher.App.Services;
 using Launcher.App.ViewModels;
+using Launcher.Protocol;
+using Serilog;
 
 namespace Launcher.App;
 
@@ -17,9 +20,20 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            ILauncherFacade facade;
+            try
+            {
+                facade = CoreServices.Create().Facade;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "初始化 Core 失败，回退到 FakeLauncherFacade");
+                facade = new FakeLauncherFacade();
+            }
+
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(new FakeLauncherFacade()),
+                DataContext = new MainWindowViewModel(facade),
             };
         }
 
