@@ -1,0 +1,30 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Launcher.App.ViewModels"
+             xmlns:views="using:Launcher.App.Views"
+             x:Class="Launcher.App.App"
+             RequestedThemeVariant="Dark">
+  <Application.DataTemplates>
+    <DataTemplate DataType="vm:HomeViewModel">
+      <views:HomeView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:InstancesViewModel">
+      <views:InstancesView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:DownloadViewModel">
+      <views:DownloadView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:AccountsViewModel">
+      <views:AccountsView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:SettingsViewModel">
+      <views:SettingsView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:LogsViewModel">
+      <views:LogsView />
+    </DataTemplate>
+  </Application.DataTemplates>
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+</Application>

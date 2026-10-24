@@ -50,7 +50,7 @@
 | 项 | 选型 | 修订说明 |
 |---|---|---|
 | 运行时 | **只钉一个 TFM**：优先 `net10.0-windows`；若两人环境不一致，统一降到 `net8.0-windows` | 「10 与 8 API 兼容」不成立；用 `global.json` 钉 SDK |
-| UI | Avalonia 11 | Windows 优先，预留跨平台 |
+| UI | Avalonia 12.1.4 | Windows 优先；M0 实际使用版本 |
 | MVVM | CommunityToolkit.Mvvm | |
 | 日志 | `Microsoft.Extensions.Logging.Abstractions`（Core）+ **Serilog** 文件 sink（App） | Core 只依赖抽象；sink 选型统一 |
 | CLI 解析 | **System.CommandLine** | 不手写解析，参数与门面语义统一 |
@@ -491,7 +491,7 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 - **argfile 编码（P0 修正，写死）**：
   - 编码由目标 JRE 主版本**静态决定**：**JDK ≤17 → 系统 ANSI 代码页**（`CultureInfo.CurrentCulture.TextInfo.ANSICodePage`，中文 Windows 为 936）；**JDK ≥18 → UTF-8**（JEP 400）。
   - 首次遇到某个 Java 路径时做一次 `sun.jnu.encoding` 探测，结果**缓存到 DB**（`java_path → encoding`）；之后启动不再起进程。
-  - **`.NET Core` 的 `Encoding.Default` 恒为 UTF-8，禁止使用**；必须注册 `CodePagesEncodingProvider.Instance` 并 `Encoding.GetEncoding(ansiCodePage)`（依赖 `System.Text.Encoding.CodePages`）。
+  - **`.NET Core` 的 `Encoding.Default` 恒为 UTF-8，禁止使用**；必须注册 `CodePagesEncodingProvider.Instance` 并 `Encoding.GetEncoding(ansiCodePage)`（.NET 10 已内置该类型，无需额外包）。
   - **禁止无条件 UTF-8**：含中文的实例/资源路径会变乱码，表现为 `Could not find or load main class`。
 - **argfile 转义**：一行一个参数；参数含空格、制表、引号或 `#` 时用双引号包裹，并转义 `\` 与 `"`；不依赖 shell 引号规则。
 - **argfile 生命周期（修订，P0-2）**：
@@ -739,7 +739,7 @@ docs: 契约 v0.5
 
 > 无时间估算，只排顺序与验收。`[A]`=核心，`[B]`=应用，`[AB]`=共同。
 
-### M0 骨架 + 离线身份（修订：离线认证前移）
+### M0 骨架 + 离线身份（修订：离线认证前移）——✅ 2026-10-24 完成
 
 - `[A]` 解决方案、`global.json`/`Directory.*`/`.editorconfig`/`NuGet.config`/`dotnet-tools.json`
 - `[A]` `LauncherPaths`、`AppSettings`、日志、**SQLite v3 + 迁移**、原子写、单实例互斥、全局异常兜底
@@ -841,14 +841,13 @@ docs: 契约 v0.5
 | authlib-injector | AGPL-3.0 | **否** | 运行期下载 + SHA1；关于页附源码链接 |
 | `com.bangbang93.ForgeInstaller` | **未登记（发布门禁）** | **待定** | Forge ≤1.12.2；随包前必须核实许可证并登记 `THIRD_PARTY_NOTICES.md` |
 | Forge / NeoForge installer | LGPL-2.1（待复核） | **否** | 运行期从官方 maven 下载 |
-| Avalonia 11 | MIT | 是 | UI |
+| Avalonia 12 | MIT | 是 | UI |
 | CommunityToolkit.Mvvm | MIT | 是 | MVVM |
 | Polly.Core | BSD-3-Clause | 是 | 韧性 |
 | Microsoft.Data.Sqlite / SQLitePCLRaw | MIT / Apache-2.0 | 是 | 数据库 |
 | Velopack | MIT | 是 | 更新/安装器 |
 | Serilog（含 `Sinks.File`） | Apache-2.0 | 是 | 文件日志 |
 | System.CommandLine | MIT | 是 | CLI 解析 |
-| System.Text.Encoding.CodePages | MIT | 是 | argfile ANSI 代码页（§6.5） |
 | NetArchTest.Rules | MIT（待复核） | 否 | 仅测试 |
 | CmlLib.Core | MIT（已复核） | 待定（优先评估） | M1 前评估；若引入仅作元数据/下载/启动原语 |
 

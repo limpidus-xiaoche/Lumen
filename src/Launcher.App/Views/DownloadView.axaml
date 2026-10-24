@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Launcher.App.Views.DownloadView">
+  <StackPanel Margin="28" Spacing="12">
+    <TextBlock Text="下载" FontSize="26" FontWeight="Bold" />
+    <TextBlock Text="{Binding StatusText}" />
+    <ItemsControl ItemsSource="{Binding Versions}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <TextBlock Text="{Binding}" Padding="0,4" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

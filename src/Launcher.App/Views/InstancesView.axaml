@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Launcher.App.Views.InstancesView">
+  <StackPanel Margin="28" Spacing="12">
+    <TextBlock Text="实例" FontSize="26" FontWeight="Bold" />
+    <TextBlock Text="{Binding StatusText}" />
+    <Button Content="加载实例" Command="{Binding LoadCommand}" />
+    <ItemsControl ItemsSource="{Binding Instances}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <Border Padding="12" Margin="0,4" Background="#1B1E26" CornerRadius="6">
+            <StackPanel Spacing="2">
+              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding VersionId}" Opacity="0.7" />
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

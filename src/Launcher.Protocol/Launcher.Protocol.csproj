@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Launcher.Protocol</RootNamespace>
+    <AssemblyName>Launcher.Protocol</AssemblyName>
+  </PropertyGroup>
+</Project>

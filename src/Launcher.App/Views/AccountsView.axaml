@@ -1,0 +1,10 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Launcher.App.Views.AccountsView">
+  <StackPanel Margin="28" Spacing="12">
+    <TextBlock Text="账户" FontSize="26" FontWeight="Bold" />
+    <TextBox Text="{Binding Username}" PlaceholderText="离线用户名" Width="260" HorizontalAlignment="Left" />
+    <Button Content="离线登录" Command="{Binding LoginOfflineCommand}" />
+    <TextBlock Text="{Binding StatusText}" />
+  </StackPanel>
+</UserControl>

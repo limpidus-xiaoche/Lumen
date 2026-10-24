@@ -1,0 +1,12 @@
+#!/bin/sh
+# 拒绝直接推送 main；请推 feat/* 分支后由 owner 合并。
+# 安装：git config core.hooksPath .githooks
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main)
+      echo "禁止直接推送 main。请推 feat/* 分支，由 owner 合并。" >&2
+      exit 1
+      ;;
+  esac
+done
+exit 0

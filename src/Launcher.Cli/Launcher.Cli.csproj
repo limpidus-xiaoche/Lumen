@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Launcher.Cli</RootNamespace>
+    <AssemblyName>lumen</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Launcher.Core\Launcher.Core.csproj" />
+    <ProjectReference Include="..\Launcher.Protocol\Launcher.Protocol.csproj" />
+  </ItemGroup>
+</Project>

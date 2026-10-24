@@ -26,7 +26,7 @@
 - [x] `technoledge.md` **v0.4 复审（两轮）**：第 1 轮 6 个 P0 + 第 2 轮 3 个新增 P0，见下「v0.4 复审记录」
 - [x] `technoledge.md` 升版 **v0.5**：P0/P1 全部回写（CmlLib 边界、协作身份、许可存证、编码/源/任务/SSRF/lzma、DTO、孤儿进程、hook、发布形态、路径/GC）
 - [ ] **临时**：使用仓库 deploy key 推送（`ttss4096` 账号暂不可用）；账号恢复后迁移到 collaborators + 用户级 SSH，deploy key 降为只读
-- [ ] M0：解决方案骨架（**用户要求暂不搭建**）
+- [x] **M0 完成**：解决方案 + Protocol/Core/App/CLI + SQLite v3 + 离线身份 + 六页 Avalonia 壳 + FakeLauncherFacade + 8 项测试 + pre-push hook 文件
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -88,7 +88,7 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 
 - 代号：`Lumen`（发布名待定，避开 VersePC 前缀；发布前做商标检索）。
 - 平台：**v1 仅 Windows 10/11 x64**；跨平台列入 v2 非目标（DPAPI / 注册表 / 签名均为平台相关）。
-- 技术栈：`.NET 10 LTS`（环境不一致则统一 `.NET 8 LTS`，单一 TFM 由 `global.json` 钉死）+ `Avalonia 11` + `CommunityToolkit.Mvvm` + `Polly.Core`；`System.Text.Json` 源生成；SQLite 存索引，JSON 存配置。
+- 技术栈：`.NET 10 LTS`（环境不一致则统一 `.NET 8 LTS`，单一 TFM 由 `global.json` 钉死）+ `Avalonia 12.1.4` + `CommunityToolkit.Mvvm` + `Polly.Core`；`System.Text.Json` 源生成；SQLite 存索引，JSON 存配置。
 - 形态：单进程 GUI + 可复用 `Launcher.Core` 类库 + `Launcher.Cli`（内核可被 CLI/测试直接驱动）；`Core` 不引用任何 UI 类型。
 - 规避 32K 命令行：Java 9+ 用 `@argfile`（**等首行 stdout 后删除** + ACL 收紧）；Java 8 回退 wrapper jar（对标 PCL2 JavaWrapper）。
 - Forge/NeoForge：≤1.12.2 使用 `com.bangbang93.ForgeInstaller`（**许可证核验为发布门禁**），1.13+ 走官方 installer；`authlib-injector` 不随包分发。分发只用 Velopack（`Setup.exe` + delta + Portable zip），不产 MSI。
@@ -97,6 +97,18 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 - 复用策略：优先评估 **CmlLib.Core（MIT）** 覆盖元数据/下载/启动原语；**不 fork XMCL / PCL2**，XMCL 仅作 UX 参考。
 - 许可证：本项目 **MIT**；随包第三方必须与 MIT 兼容，不兼容者仅运行期下载/调用，并登记 `THIRD_PARTY_NOTICES.md`。
 - v1 范围：元数据 → 安装 → 启动 → Java 管理 → 离线/微软/外置登录 → 实例隔离 → 模组/整合包 → 自更新。AI/联机/皮肤站作为 v2。
+
+## M0 验收结果（2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| `dotnet build` | 0 警告 / 0 错误（SDK 10.0.300，`net10.0-windows`） |
+| `dotnet test` | 8 项通过（Core 5 / App 2 / Integration 1） |
+| CLI `offline-uuid --name Player` | `a01e3843-e521-3998-958a-f459800e4d11` |
+| CLI `paths` | `%APPDATA%\Lumen` / `%LOCALAPPDATA%\Lumen` 已拆分 |
+| GUI 冒烟 | `Lumen.exe` 启动并保持运行；日志写入 `%LOCALAPPDATA%\Lumen\logs` |
+| 架构测试 | Core 不依赖 Avalonia / Hosting / DI |
+| pre-push hook | 文件已提交，待执行 `git config core.hooksPath .githooks` 启用 |
 
 ## 目标样本
 
@@ -170,6 +182,11 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              移除 MCBBS、源表改 sources.json；补 Cancel/Retry/GetRunningSessions 与全部 DTO；
              下载 URL 白名单/私网拒绝；java-runtime 只取 raw；发布形态/R2R、integrity CI 生成、路径校验与 blobs GC。
              仓库协作收尾待 owner 操作（加 collaborators、降权 deploy key）。
+
+[2026-10-24] M0 完成：
+             solution + Launcher.Protocol / Core / App / Cli；SQLite v3 + 迁移入口；离线 UUID/伪 token；
+             六页 Avalonia 壳 + FakeLauncherFacade；Serilog；单实例互斥；LICENSE / THIRD_PARTY_NOTICES / 许可存档；
+             build 0 警告 0 错误；8 项测试通过；CLI 与 GUI 冒烟通过；pre-push hook 文件已提交。
 
 [2026-10-24] 协作方式临时调整：`ttss4096` 账号暂不可用，继续使用仓库 deploy key 推送；
              工作流改为「推 feat/* 分支 → owner 在网页端合并」，不直推 main；

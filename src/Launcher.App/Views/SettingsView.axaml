@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Launcher.App.Views.SettingsView">
+  <StackPanel Margin="28" Spacing="12">
+    <TextBlock Text="设置" FontSize="26" FontWeight="Bold" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock Text="最大内存 (MB)" VerticalAlignment="Center" />
+      <TextBox Text="{Binding MaxMemoryMb}" Width="120" />
+    </StackPanel>
+    <Button Content="保存设置" Command="{Binding SaveCommand}" />
+    <TextBlock Text="{Binding StatusText}" />
+  </StackPanel>
+</UserControl>
