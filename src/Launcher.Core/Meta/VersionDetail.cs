@@ -16,7 +16,8 @@ public sealed class VersionDetail
     [JsonPropertyName("libraries")] public List<Library> Libraries { get; set; } = [];
     [JsonPropertyName("arguments")] public VersionArguments? Arguments { get; set; }
     [JsonPropertyName("minecraftArguments")] public string? MinecraftArguments { get; set; }
-    [JsonPropertyName("releaseTime")] public DateTimeOffset? ReleaseTime { get; set; }
+    /// <summary>发布时间。Fabric profile 里是「+0000」形式，按字符串保留避免解析失败。</summary>
+    [JsonPropertyName("releaseTime")] public string? ReleaseTime { get; set; }
 }
 
 public sealed class AssetIndexRef
@@ -53,6 +54,12 @@ public sealed class JavaVersionRef
 public sealed class Library
 {
     [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
+
+    /// <summary>加载器 profile JSON 使用的仓库根地址（如 https://maven.fabricmc.net/）。</summary>
+    [JsonPropertyName("url")] public string? Url { get; set; }
+
+    [JsonPropertyName("sha1")] public string? Sha1 { get; set; }
+    [JsonPropertyName("size")] public long Size { get; set; }
     [JsonPropertyName("downloads")] public LibraryDownloads? Downloads { get; set; }
     [JsonPropertyName("rules")] public List<Rule>? Rules { get; set; }
     [JsonPropertyName("natives")] public Dictionary<string, string>? Natives { get; set; }

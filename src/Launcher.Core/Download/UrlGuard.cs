@@ -28,6 +28,8 @@ public static class UrlGuard
         "cdn.modrinth.com",
         "maven.minecraftforge.net",
         "maven.neoforged.net",
+        "maven.fabricmc.net",
+        "maven.quiltmc.org",
         "github.com",
         "api.github.com",
         "objects.githubusercontent.com",

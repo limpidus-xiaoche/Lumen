@@ -3,9 +3,9 @@
         xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="Launcher.App.MainWindow"
         Title="Lumen"
-        Width="920"
+        Width="820"
         Height="560"
-        MinWidth="800"
+        MinWidth="700"
         MinHeight="480"
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
@@ -85,7 +85,7 @@
     <!-- 自定义标题栏（PCL2 风格：无系统标题栏，Logo 居左，账号区+关闭按钮居右） -->
     <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
             chrome:WindowDecorationProperties.ElementRole="TitleBar">
-      <DockPanel>
+      <DockPanel LastChildFill="False">
 
         <!-- 左侧：作者标识（简洁两行：品牌 + 定位） -->
         <StackPanel DockPanel.Dock="Left" Margin="16,0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -109,24 +109,27 @@
     </Border>
 
     <!-- 主区：左侧导航 + 右侧页面 -->
-    <Grid Grid.Row="1" ColumnDefinitions="220,*">
+    <Grid Grid.Row="1" ColumnDefinitions="172,*">
 
       <!-- 左侧导航栏（PCL2 风格：竖排大按钮） -->
       <Border Grid.Column="0" Background="{DynamicResource SidebarBackground}">
         <DockPanel>
           <!-- 三大导航按钮：启动 / 下载 / 设置 -->
           <ListBox DockPanel.Dock="Top"
-                   Margin="8,18,8,0"
+                   Margin="10,26,10,0"
                    ItemsSource="{Binding Pages}"
                    SelectedItem="{Binding SelectedPage}"
                    Background="Transparent"
                    BorderThickness="0">
             <ListBox.ItemContainerTheme>
               <ControlTheme TargetType="ListBoxItem">
-                <Setter Property="Padding" Value="18,13" />
-                <Setter Property="Margin" Value="2,3" />
-                <Setter Property="FontSize" Value="15" />
-                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Padding" Value="22,16" />
+                <Setter Property="Margin" Value="4,8" />
+                <Setter Property="FontSize" Value="17" />
+                <Setter Property="MinHeight" Value="52" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
                 <Setter Property="Template">
@@ -141,7 +144,8 @@
                                           Content="{TemplateBinding Content}"
                                           ContentTemplate="{TemplateBinding ContentTemplate}"
                                           Foreground="{TemplateBinding Foreground}"
-                                          VerticalAlignment="Center" />
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
                       </Border>
                     </ControlTemplate>
                   </Setter.Value>
@@ -163,9 +167,28 @@
             </ListBox.ItemTemplate>
           </ListBox>
 
-          <!-- 底部：版本信息（低调，作者标识已上移） -->
-          <StackPanel DockPanel.Dock="Bottom" Margin="20,0,20,16">
+          <!-- 底部：更多入口 + 版本信息 -->
+          <StackPanel DockPanel.Dock="Bottom" Margin="10,0,10,16" Spacing="4">
+            <Button Content="更多"
+                    Command="{Binding ShowMoreCommand}"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Padding="22,16"
+                    Margin="4,8"
+                    MinHeight="52"
+                    CornerRadius="12"
+                    FontSize="17"
+                    Background="Transparent"
+                    Foreground="{DynamicResource TextSecondary}">
+              <Button.Styles>
+                <Style Selector="Button:pointerover">
+                  <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+                </Style>
+              </Button.Styles>
+            </Button>
+
             <TextBlock Text="Lumen 0.1 · M0"
+                       Margin="26,0,0,0"
                        FontSize="11"
                        Opacity="0.45"
                        Foreground="{DynamicResource TextMuted}" />
@@ -177,38 +200,6 @@
       <Border Grid.Column="1" Background="{DynamicResource ContentBackground}">
         <Grid>
           <ContentControl Content="{Binding CurrentPage}" Margin="8" />
-
-          <!-- 右上角竖排账号区（PCL2 风格：pill + 大头像 + 用户名） -->
-          <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,18,0"
-                  Background="{DynamicResource CardBackground}"
-                  CornerRadius="16"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1"
-                  Padding="14,10">
-            <StackPanel Orientation="Vertical" Spacing="8">
-              <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
-                <RadioButton Classes="mode-pill" GroupName="AuthMode"
-                             Content="离线"
-                             IsChecked="{Binding Accounts.OfflineMode}" />
-                <RadioButton Classes="mode-pill" GroupName="AuthMode"
-                             Content="正版"
-                             IsChecked="{Binding Accounts.OnlineMode}" />
-              </StackPanel>
-              <Border Width="80" Height="80" CornerRadius="12"
-                      Background="{DynamicResource ContentBackground}"
-                      BorderBrush="{DynamicResource BorderBrush}"
-                      BorderThickness="1"
-                      HorizontalAlignment="Center">
-                <Image Source="{Binding Accounts.Avatar}"
-                       RenderOptions.BitmapInterpolationMode="None"
-                       Stretch="UniformToFill" />
-              </Border>
-              <TextBlock Text="{Binding Accounts.Username}"
-                         FontSize="14" FontWeight="SemiBold"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource TextPrimary}" />
-            </StackPanel>
-          </Border>
         </Grid>
       </Border>
     </Grid>

@@ -1,31 +1,327 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Launcher.App.Views.DownloadView">
-  <ScrollViewer>
-    <StackPanel Margin="28" Spacing="12">
-      <TextBlock Text="下载" FontSize="26" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
-      <TextBlock Text="{Binding LatestRelease, StringFormat='最新正式版：{0}'}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+  <UserControl.Styles>
+    <!-- 横向分类按钮（选中项青色高亮） -->
+    <Style Selector="RadioButton.cat">
+      <Setter Property="Padding" Value="22,11" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border Background="{TemplateBinding Background}"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter Content="{TemplateBinding Content}"
+                                Foreground="{TemplateBinding Foreground}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.cat:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="RadioButton.cat:checked">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </UserControl.Styles>
 
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Content="加载版本列表" Command="{Binding LoadCommand}" />
-        <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondary}" FontSize="12" />
+  <ScrollViewer>
+    <StackPanel Margin="28,20,28,24" Spacing="16" MaxWidth="620" HorizontalAlignment="Left">
+
+      <TextBlock Text="下载" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+
+      <!-- 横向分类：原版游戏 / 模组 -->
+      <ListBox ItemsSource="{Binding Categories}"
+               SelectedItem="{Binding SelectedCategory}"
+               HorizontalAlignment="Left"
+               Background="Transparent" BorderThickness="0" Padding="0">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="10" />
+          </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemContainerTheme>
+          <ControlTheme TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="20,10" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                  <Border Background="{TemplateBinding Background}"
+                          CornerRadius="{TemplateBinding CornerRadius}"
+                          Padding="{TemplateBinding Padding}">
+                    <ContentPresenter Content="{TemplateBinding Content}"
+                                      Foreground="{TemplateBinding Foreground}" />
+                  </Border>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+            <Style Selector="^:pointerover">
+              <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+            </Style>
+            <Style Selector="^:selected">
+              <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+              <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+              <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+          </ControlTheme>
+        </ListBox.ItemContainerTheme>
+      </ListBox>
+
+      <!-- 原版游戏 -->
+      <StackPanel IsVisible="{Binding IsVanilla}" Spacing="10">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <TextBox Text="{Binding VanillaQuery}" Watermark="搜索版本号，如 1.20.1 或 26.3" FontSize="12" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding VersionFilters}"
+                    SelectedItem="{Binding SelectedVersionFilter}" Width="96" FontSize="12" />
+          <Button Grid.Column="2" Content="刷新清单" Command="{Binding LoadCommand}"
+                  Padding="12,7" CornerRadius="8" FontSize="12" />
+        </Grid>
+
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <TextBlock Text="游戏版本" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{DynamicResource TextMuted}" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding Versions}"
+                    SelectedItem="{Binding SelectedVersion}"
+                    HorizontalAlignment="Stretch" FontSize="12">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding Id}" FontSize="12" />
+                  <TextBlock Text="{Binding TypeText}" FontSize="10" Opacity="0.55" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+          <TextBlock Text="实例名" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{DynamicResource TextMuted}" />
+          <TextBox Grid.Column="1" Text="{Binding InstanceName}" Watermark="留空则使用版本号" FontSize="12" />
+          <Button Grid.Column="2" Content="安装原版" Command="{Binding InstallVanillaCommand}"
+                  IsEnabled="{Binding !IsInstalling}"
+                  Padding="16,7" CornerRadius="8" FontSize="12"
+                  Background="{DynamicResource AccentBrush}" Foreground="#F4FFFD" />
+        </Grid>
+
+        <StackPanel Spacing="4" IsVisible="{Binding IsInstalling}">
+          <ProgressBar Value="{Binding InstallPercent}" Maximum="100" Height="4" />
+          <TextBlock Text="{Binding InstallStageText}" FontSize="11"
+                     Foreground="{DynamicResource TextMuted}" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding StatusText}" FontSize="11" TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextMuted}" />
+
+        <!-- 加载器版本：完整版本号列表 + Fabric / Quilt 一键安装 -->
+        <Border Background="{DynamicResource CardBackground}" CornerRadius="10"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="加载器版本" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}" />
+            <Grid ColumnDefinitions="Auto,*,*,Auto" ColumnSpacing="8">
+              <TextBlock Text="加载器" FontSize="11" VerticalAlignment="Center"
+                         Foreground="{DynamicResource TextMuted}" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding LoaderKinds}"
+                        SelectedItem="{Binding SelectedLoaderName}"
+                        HorizontalAlignment="Stretch" FontSize="12" />
+              <ComboBox Grid.Column="2" ItemsSource="{Binding LoaderGameVersions}"
+                        SelectedItem="{Binding SelectedLoaderGameVersion}"
+                        HorizontalAlignment="Stretch" FontSize="12" />
+              <ComboBox Grid.Column="3" ItemsSource="{Binding LoaderVersions}"
+                        SelectedItem="{Binding SelectedLoaderVersion}"
+                        Width="150" FontSize="12">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding Version}" FontSize="12" />
+                      <TextBlock Text="稳定" IsVisible="{Binding Stable}" FontSize="10"
+                                 Opacity="0.55" VerticalAlignment="Center" />
+                      <TextBlock Text="历史" IsVisible="{Binding !Stable}" FontSize="10"
+                                 Opacity="0.55" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{Binding LoaderSupportText}" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextMuted}" />
+                <TextBlock Text="{Binding LoaderStatusText}" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextSecondary}" />
+              </StackPanel>
+              <Button Grid.Column="1" Content="安装加载器"
+                      Command="{Binding InstallLoaderCommand}"
+                      IsEnabled="{Binding CanInstallLoader}"
+                      Padding="14,7" CornerRadius="8" FontSize="12"
+                      Background="{DynamicResource AccentSoft}"
+                      Foreground="{DynamicResource AccentGlow}" />
+            </Grid>
+          </StackPanel>
+        </Border>
       </StackPanel>
 
-      <ScrollViewer Height="400">
-        <ItemsControl ItemsSource="{Binding Versions}">
+      <!-- 模组（Modrinth / CurseForge） -->
+      <StackPanel IsVisible="{Binding IsMods}" Spacing="10">
+        <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+          <TextBlock Grid.Column="0" Text="安装到" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{DynamicResource TextMuted}" Margin="0,0,8,0" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding Instances}"
+                    SelectedItem="{Binding SelectedInstance}"
+                    HorizontalAlignment="Left" MinWidth="200" FontSize="12">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+
+        <!-- 搜索行：关键字 + 渠道（Modrinth / CurseForge） -->
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBox Text="{Binding ModQuery}" Watermark="搜索模组名，如 sodium" Width="190" FontSize="13" />
+          <ComboBox ItemsSource="{Binding ModSources}" SelectedItem="{Binding SelectedSourceName}"
+                    Width="112" FontSize="12" />
+          <Button Content="搜索" Command="{Binding SearchFirstCommand}"
+                  Padding="18,8" CornerRadius="8" FontSize="12"
+                  Background="{DynamicResource AccentBrush}" Foreground="#F4FFFD" />
+        </StackPanel>
+
+        <!-- 状态行 + 分类开关（收纳式，默认收起，避免页面拥挤） -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0" Text="{Binding StatusText}" FontSize="12"
+                     VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+          <Button Grid.Column="1" Content="{Binding CategoryToggleText}"
+                  Command="{Binding ToggleCategoriesCommand}"
+                  Padding="12,6" CornerRadius="8" FontSize="12" />
+        </Grid>
+
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Spacing="8">
+          <ScrollViewer MaxHeight="196">
+          <ItemsControl ItemsSource="{Binding ModResults}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Border Padding="12" Margin="0,3" Background="{DynamicResource CardBackground}" CornerRadius="6"
-                      BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                  <TextBlock Text="{Binding Id}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Width="220" />
-                  <TextBlock Text="{Binding Type}" Opacity="0.6" Foreground="{DynamicResource TextSecondary}" />
-                </StackPanel>
+              <Border Background="{DynamicResource CardBackground}" CornerRadius="8"
+                      BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                      Padding="12,10" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                  <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8"
+                          Background="{DynamicResource ContentBackground}"
+                          BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                          ClipToBounds="True">
+                    <Grid>
+                      <Image Source="{Binding Icon}" IsVisible="{Binding HasIcon}" Stretch="UniformToFill" />
+                      <TextBlock Text="{Binding Initial}" IsVisible="{Binding !HasIcon}"
+                                 FontSize="16" FontWeight="SemiBold"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource TextMuted}" />
+                    </Grid>
+                  </Border>
+
+                  <StackPanel Grid.Column="1" Spacing="2" Margin="12,0" VerticalAlignment="Center">
+                    <!-- 中英并显：中文名在上，英文原名不同时并排显示 -->
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding ChineseTitle}" FontSize="13"
+                                 Foreground="{DynamicResource TextPrimary}" />
+                      <TextBlock Text="{Binding Title}" IsVisible="{Binding ShowEnglish}"
+                                 FontSize="11" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource TextMuted}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Description}" FontSize="11" TextWrapping="Wrap"
+                               MaxLines="2" Foreground="{DynamicResource TextMuted}" />
+                    <TextBlock FontSize="10" Foreground="{DynamicResource TextMuted}">
+                      <Run Text="{Binding AuthorText}" />
+                      <Run Text=" · " />
+                      <Run Text="{Binding DownloadsText}" />
+                    </TextBlock>
+                  </StackPanel>
+
+                  <Button Grid.Column="2" Content="安装"
+                          Command="{Binding $parent[ItemsControl].DataContext.InstallModCommand}"
+                          CommandParameter="{Binding}"
+                          Padding="16,7" CornerRadius="8" FontSize="12"
+                          Background="{DynamicResource AccentSoft}"
+                          Foreground="{DynamicResource AccentGlow}" />
+                </Grid>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
+          </ItemsControl>
+          </ScrollViewer>
+
+          <!-- 分页：每页 20 条，避免长列表把分类栏顶出视野 -->
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
+            <Button Content="上一页" Command="{Binding PrevPageCommand}"
+                    Padding="12,6" CornerRadius="8" FontSize="12" />
+            <TextBlock Text="{Binding PageText}" FontSize="12" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextMuted}" />
+            <Button Content="下一页" Command="{Binding NextPageCommand}"
+                    Padding="12,6" CornerRadius="8" FontSize="12" />
+          </StackPanel>
+          </StackPanel>
+
+          <!-- 右侧分类栏：可收纳，默认收起 -->
+          <Border Grid.Column="1" Width="150" Margin="12,0,0,0"
+                  IsVisible="{Binding IsCategoryOpen}"
+                  Background="{DynamicResource CardBackground}" CornerRadius="10"
+                  BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                  Padding="6">
+            <ListBox ItemsSource="{Binding ModCategories}"
+                     SelectedItem="{Binding SelectedModCategory}"
+                     Background="Transparent" BorderThickness="0" Padding="0">
+              <ListBox.ItemContainerTheme>
+                <ControlTheme TargetType="ListBoxItem">
+                  <Setter Property="Padding" Value="12,7" />
+                  <Setter Property="CornerRadius" Value="7" />
+                  <Setter Property="FontSize" Value="13" />
+                  <Setter Property="Background" Value="Transparent" />
+                  <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                  <Setter Property="Template">
+                    <Setter.Value>
+                      <ControlTemplate TargetType="ListBoxItem">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}">
+                          <ContentPresenter Content="{TemplateBinding Content}"
+                                            Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                      </ControlTemplate>
+                    </Setter.Value>
+                  </Setter>
+                  <Style Selector="^:pointerover">
+                    <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+                  </Style>
+                  <Style Selector="^:selected">
+                    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+                  </Style>
+                </ControlTheme>
+              </ListBox.ItemContainerTheme>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Title}" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Border>
+        </Grid>
+      </StackPanel>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Launcher.App.Views.MoreView">
+  <ScrollViewer>
+    <StackPanel Margin="28,24,28,24" Spacing="14" MaxWidth="560" HorizontalAlignment="Left">
+
+      <TextBlock Text="更多" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+
+      <!-- 关于 -->
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="10"
+              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="18">
+        <StackPanel Spacing="8">
+          <TextBlock Text="关于 Lumen" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+          <TextBlock Text="{Binding AppVersion, StringFormat='版本 {0}'}"
+                     FontSize="12" Foreground="{DynamicResource TextSecondary}" />
+          <TextBlock Text="由 麦谷Limpidus 开发。轻量、简洁的 Minecraft 启动器，专注于干净的启动体验。"
+                     FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" />
+          <Button Content="项目主页" Command="{Binding OpenProjectPageCommand}"
+                  HorizontalAlignment="Left" Padding="14,8" CornerRadius="8" FontSize="12" />
+        </StackPanel>
+      </Border>
+
+      <!-- 功能对接 -->
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="10"
+              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="18">
+        <StackPanel Spacing="10">
+          <TextBlock Text="功能对接" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+          <ItemsControl ItemsSource="{Binding Features}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="110,*" Margin="0,4">
+                  <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12"
+                             Foreground="{DynamicResource TextSecondary}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Detail}" FontSize="12"
+                             TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- 免责声明 -->
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="10"
+              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="18">
+        <StackPanel Spacing="8">
+          <TextBlock Text="免责声明" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+          <TextBlock FontSize="12" TextWrapping="Wrap" LineHeight="20"
+                     Foreground="{DynamicResource TextMuted}"
+                     Text="本启动器与 Mojang Studios、Microsoft 无任何关联，未获其授权或认可。Minecraft 及其相关素材、商标的版权归 Mojang Studios 所有。" />
+          <TextBlock FontSize="12" TextWrapping="Wrap" LineHeight="20"
+                     Foreground="{DynamicResource TextMuted}"
+                     Text="本启动器不分发、不内置游戏本体，游戏文件均通过官方渠道获取；请支持正版。" />
+          <TextBlock FontSize="12" TextWrapping="Wrap" LineHeight="20"
+                     Foreground="{DynamicResource TextMuted}"
+                     Text="Fabric、Forge、NeoForge 等加载器及第三方模组的版权归各自作者所有，本启动器仅提供调用与整合，不对其内容负责。" />
+          <TextBlock FontSize="12" TextWrapping="Wrap" LineHeight="20"
+                     Foreground="{DynamicResource TextMuted}"
+                     Text="界面交互习惯参考了 PCL2 的使用方式，未使用其任何代码；本项目同样不包含任何他人的闭源或未授权内容。" />
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

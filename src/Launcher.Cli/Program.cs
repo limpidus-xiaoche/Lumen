@@ -14,7 +14,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 var launcherPaths = LauncherPaths.CreateDefault(LauncherPaths.IsPortableRequested(args));
 launcherPaths.EnsureCreated();
 var manifestClient = new ManifestClient(launcherPaths);
-var resolver = new VersionResolver(manifestClient);
+var loaderMetaClient = new LoaderMetaClient(launcherPaths);
+var resolver = new VersionResolver(manifestClient, loaderMetaClient);
 var javaLocator = new JavaLocator(launcherPaths);
 
 var settingsStore = new AppSettingsStore(launcherPaths);
@@ -43,7 +44,8 @@ var facade = new LauncherFacade(
     javaLocator,
     installer,
     new TaskRegistry(),
-    launcher);
+    launcher,
+    loaderMetaClient);
 
 var root = new RootCommand("Lumen CLI");
 
@@ -144,12 +146,22 @@ var skipAssetsOption = new Option<bool>("--skip-assets")
 {
     Description = "跳过资源文件下载（仅用于快速验证）",
 };
+var loaderOption = new Option<string>("--loader")
+{
+    Description = "加载器：vanilla / fabric / quilt / forge / neoforge（默认 vanilla）",
+};
+var loaderVersionOption = new Option<string>("--loader-version")
+{
+    Description = "加载器版本号，例如 Fabric 0.16.10",
+};
 
-var installCommand = new Command("install", "安装原版实例");
+var installCommand = new Command("install", "安装原版或带加载器的实例");
 installCommand.Arguments.Add(installVersionArgument);
 installCommand.Options.Add(installInstanceOption);
 installCommand.Options.Add(installNameOption);
 installCommand.Options.Add(skipAssetsOption);
+installCommand.Options.Add(loaderOption);
+installCommand.Options.Add(loaderVersionOption);
 installCommand.SetAction(result =>
 {
     var version = result.GetValue(installVersionArgument);
@@ -159,17 +171,34 @@ installCommand.SetAction(result =>
         return;
     }
 
-    var instanceId = result.GetValue(installInstanceOption) ?? $"vanilla-{version}";
+    var loaderText = result.GetValue(loaderOption) ?? "vanilla";
+    if (!Enum.TryParse<LoaderKind>(loaderText, ignoreCase: true, out var loader))
+    {
+        Console.Error.WriteLine($"未知加载器：{loaderText}");
+        return;
+    }
+
+    var loaderVersion = result.GetValue(loaderVersionOption);
+    if (loader != LoaderKind.Vanilla && string.IsNullOrWhiteSpace(loaderVersion))
+    {
+        Console.Error.WriteLine("未指定 --loader-version");
+        return;
+    }
+
+    var instanceId = result.GetValue(installInstanceOption)
+        ?? (loader == LoaderKind.Vanilla
+            ? $"vanilla-{version}"
+            : $"{version}-{loader.ToString().ToLowerInvariant()}-{loaderVersion}");
     var name = result.GetValue(installNameOption) ?? version;
     var request = new InstallRequest(
-        instanceId, name, version, LoaderKind.Vanilla, null,
+        instanceId, name, version, loader, loaderVersion,
         IsolationLevel.ModsConfig, InstallMode.New, result.GetValue(skipAssetsOption));
 
     var progress = new Progress<InstallProgress>(p =>
         Console.WriteLine($"[{p.Stage}] {p.Percent:F1}% {p.Message}"));
 
     var summary = facade.InstallAsync(request, progress, CancellationToken.None).GetAwaiter().GetResult();
-    Console.WriteLine($"installed id={summary.Id} state={summary.State}");
+    Console.WriteLine($"installed id={summary.Id} state={summary.State} loader={summary.Loader} {summary.LoaderVersion}");
 });
 
 var repairInstanceArgument = new Argument<string>("instance")
@@ -258,6 +287,61 @@ sessionsCommand.SetAction(_ =>
     }
 });
 
+var loaderGameArgument = new Argument<string>("game")
+{
+    Description = "游戏版本，例如 1.21.1",
+};
+var loaderListKindOption = new Option<string>("--loader")
+{
+    Description = "fabric / quilt / forge / neoforge（默认全部列出）",
+};
+var loaderLimitOption = new Option<int>("--limit")
+{
+    Description = "每个加载器最多列出的版本数（默认 10）",
+};
+
+var loaderVersionsCommand = new Command("loader-versions", "列出可下载的加载器版本号");
+loaderVersionsCommand.Arguments.Add(loaderGameArgument);
+loaderVersionsCommand.Options.Add(loaderListKindOption);
+loaderVersionsCommand.Options.Add(loaderLimitOption);
+loaderVersionsCommand.SetAction(result =>
+{
+    var game = result.GetValue(loaderGameArgument) ?? throw new ArgumentException("缺少游戏版本");
+    var limit = result.GetValue(loaderLimitOption);
+    if (limit <= 0)
+    {
+        limit = 10;
+    }
+
+    var loaderText = result.GetValue(loaderListKindOption);
+    var kinds = new List<LoaderKind>();
+    if (!string.IsNullOrWhiteSpace(loaderText))
+    {
+        if (!Enum.TryParse<LoaderKind>(loaderText, ignoreCase: true, out var kind))
+        {
+            Console.Error.WriteLine($"未知加载器：{loaderText}");
+            return;
+        }
+
+        kinds.Add(kind);
+    }
+    else
+    {
+        kinds.AddRange([LoaderKind.Fabric, LoaderKind.Quilt, LoaderKind.Forge, LoaderKind.NeoForge]);
+    }
+
+    foreach (var kind in kinds)
+    {
+        var versions = loaderMetaClient.GetVersionsAsync(kind, game, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Console.WriteLine($"{kind}\t{versions.Count} 个版本\t安装支持={(LoaderMetaClient.SupportsInstall(kind) ? "是" : "否")}");
+        foreach (var version in versions.Take(limit))
+        {
+            Console.WriteLine($"  {version.Version}\t{(version.Stable ? "稳定" : "测试")}");
+        }
+    }
+});
+
 root.Subcommands.Add(offlineUuid);
 root.Subcommands.Add(pathsCommand);
 root.Subcommands.Add(versionsCommand);
@@ -268,5 +352,6 @@ root.Subcommands.Add(repairCommand);
 root.Subcommands.Add(launchCommand);
 root.Subcommands.Add(stopCommand);
 root.Subcommands.Add(sessionsCommand);
+root.Subcommands.Add(loaderVersionsCommand);
 
 return root.Parse(args).Invoke();

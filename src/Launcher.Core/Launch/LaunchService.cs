@@ -55,7 +55,7 @@ public sealed class LaunchService
             throw new LaunchException("E3003", $"实例当前状态为 {instance.State}，请先修复");
         }
 
-        var detail = await _resolver.ResolveAsync(instance.VersionId, ct);
+        var detail = await _resolver.ResolveAsync(instance.VersionId, instance.Loader, instance.LoaderVersion, ct);
         var settings = _settings.Load();
         var java = SelectJava(detail, settings);
 

@@ -21,14 +21,21 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             ILauncherFacade facade;
-            try
+            if (Environment.GetEnvironmentVariable("LUMEN_FAKE") == "1")
             {
-                facade = CoreServices.Create().Facade;
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "初始化 Core 失败，回退到 FakeLauncherFacade");
                 facade = new FakeLauncherFacade();
+            }
+            else
+            {
+                try
+                {
+                    facade = CoreServices.Create().Facade;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "初始化 Core 失败，回退到 FakeLauncherFacade");
+                    facade = new FakeLauncherFacade();
+                }
             }
 
             desktop.MainWindow = new MainWindow

@@ -5,16 +5,37 @@ namespace Launcher.Core.Meta;
 public sealed class VersionResolver
 {
     private readonly ManifestClient _client;
+    private readonly LoaderMetaClient? _loaderMeta;
 
-    public VersionResolver(ManifestClient client)
+    public VersionResolver(ManifestClient client, LoaderMetaClient? loaderMeta = null)
     {
         _client = client;
+        _loaderMeta = loaderMeta;
     }
 
     public async Task<VersionDetail> ResolveAsync(string versionId, CancellationToken ct = default)
     {
         var manifest = await _client.GetManifestAsync(force: false, ct);
         return await ResolveAsync(versionId, manifest, new HashSet<string>(StringComparer.OrdinalIgnoreCase), ct);
+    }
+
+    /// <summary>解析「原版 + 加载器」合并后的版本：原版作为父版本，加载器 profile 作为子版本。</summary>
+    public async Task<VersionDetail> ResolveAsync(
+        string versionId, LoaderKind loader, string? loaderVersion, CancellationToken ct = default)
+    {
+        var vanilla = await ResolveAsync(versionId, ct);
+        if (loader == LoaderKind.Vanilla || string.IsNullOrWhiteSpace(loaderVersion))
+        {
+            return vanilla;
+        }
+
+        if (_loaderMeta is null)
+        {
+            throw new NotSupportedException($"{loader} 需要加载器元数据客户端，当前未注入");
+        }
+
+        var profile = await _loaderMeta.GetProfileAsync(loader, versionId, loaderVersion, ct);
+        return Merge(vanilla, profile);
     }
 
     public static VersionDetail Merge(VersionDetail parent, VersionDetail child)

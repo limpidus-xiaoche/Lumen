@@ -20,6 +20,12 @@
     <DataTemplate DataType="vm:SettingsViewModel">
       <views:SettingsView />
     </DataTemplate>
+    <DataTemplate DataType="vm:VersionSettingsViewModel">
+      <views:VersionSettingsView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:MoreViewModel">
+      <views:MoreView />
+    </DataTemplate>
     <DataTemplate DataType="vm:LogsViewModel">
       <views:LogsView />
     </DataTemplate>
@@ -44,6 +50,10 @@
           <SolidColorBrush x:Key="AccentBrush" Color="#2BD4C4" />
           <SolidColorBrush x:Key="AccentSoft" Color="#1A4A42" />
           <SolidColorBrush x:Key="AccentGlow" Color="#57E5D5" />
+          <!-- 列表选中态统一走青色，覆盖 FluentTheme 默认蓝色 -->
+          <SolidColorBrush x:Key="ListBoxItemBackgroundSelected" Color="#332BD4C4" />
+          <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPointerOver" Color="#402BD4C4" />
+          <SolidColorBrush x:Key="ListBoxItemForegroundSelected" Color="#57E5D5" />
         </ResourceDictionary>
 
         <!-- 浅色主题：干净白灰 + 同系青 -->
@@ -60,6 +70,9 @@
           <SolidColorBrush x:Key="AccentBrush" Color="#0E9C8F" />
           <SolidColorBrush x:Key="AccentSoft" Color="#D8F0EB" />
           <SolidColorBrush x:Key="AccentGlow" Color="#12ADA0" />
+          <SolidColorBrush x:Key="ListBoxItemBackgroundSelected" Color="#332BD4C4" />
+          <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPointerOver" Color="#402BD4C4" />
+          <SolidColorBrush x:Key="ListBoxItemForegroundSelected" Color="#0E9C8F" />
         </ResourceDictionary>
 
       </ResourceDictionary.ThemeDictionaries>

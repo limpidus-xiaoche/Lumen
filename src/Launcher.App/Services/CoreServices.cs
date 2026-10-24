@@ -35,7 +35,8 @@ public sealed class CoreServices
 
         var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
         var manifest = new ManifestClient(paths);
-        var resolver = new VersionResolver(manifest);
+        var loaderMeta = new LoaderMetaClient(paths);
+        var resolver = new VersionResolver(manifest, loaderMeta);
         var javaLocator = new JavaLocator(paths);
         var installer = new VanillaInstaller(
             paths,
@@ -61,7 +62,8 @@ public sealed class CoreServices
             javaLocator,
             installer,
             new TaskRegistry(),
-            launcher);
+            launcher,
+            loaderMeta);
 
         return new CoreServices(paths, facade);
     }

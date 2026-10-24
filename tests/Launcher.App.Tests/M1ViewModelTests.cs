@@ -21,7 +21,9 @@ public sealed class M1ViewModelTests
     [Fact]
     public async Task SettingsViewModel_Loads_Java_List()
     {
-        var viewModel = new SettingsViewModel(new FakeLauncherFacade());
+        var facade = new FakeLauncherFacade();
+        var viewModel = new SettingsViewModel(
+            facade, new InstancesViewModel(facade), new LogsViewModel(facade), _ => { });
 
         await viewModel.LoadJavasCommand.ExecuteAsync(null);
 
