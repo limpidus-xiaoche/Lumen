@@ -15,9 +15,9 @@
   <Window.Styles>
     <!-- 账号区登录方式 pill（离线/正版）：选中项青色高亮 -->
     <Style Selector="RadioButton.mode-pill">
-      <Setter Property="Padding" Value="11,4" />
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="18,8" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="CornerRadius" Value="20" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
       <Setter Property="Template">
@@ -105,40 +105,6 @@
           <Button x:Name="BtnClose" Classes="win-btn win-btn-close" Content="×"
                   chrome:WindowDecorationProperties.ElementRole="DecorationsElement" />
         </StackPanel>
-
-        <!-- 右侧：账号区（PCL2 风格，右上角，头像较大） -->
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="12" Margin="0,0,12,0" VerticalAlignment="Center"
-                    chrome:WindowDecorationProperties.ElementRole="DecorationsElement">
-          <Border Background="{DynamicResource CardBackground}"
-                  CornerRadius="14"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1"
-                  Padding="3"
-                  VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="2">
-              <RadioButton Classes="mode-pill" GroupName="AuthMode"
-                           Content="离线"
-                           IsChecked="{Binding Accounts.OfflineMode}" />
-              <RadioButton Classes="mode-pill" GroupName="AuthMode"
-                           Content="正版"
-                           IsChecked="{Binding Accounts.OnlineMode}" />
-            </StackPanel>
-          </Border>
-          <Border Width="48" Height="48" CornerRadius="8"
-                  Background="{DynamicResource CardBackground}"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1"
-                  VerticalAlignment="Center">
-            <Image Source="{Binding Accounts.Avatar}"
-                   RenderOptions.BitmapInterpolationMode="None"
-                   Stretch="UniformToFill" />
-          </Border>
-          <StackPanel VerticalAlignment="Center" Spacing="0">
-            <TextBlock Text="{Binding Accounts.Username}"
-                       FontSize="15" FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextPrimary}" />
-          </StackPanel>
-        </StackPanel>
       </DockPanel>
     </Border>
 
@@ -209,7 +175,41 @@
 
       <!-- 右侧页面内容 -->
       <Border Grid.Column="1" Background="{DynamicResource ContentBackground}">
-        <ContentControl Content="{Binding CurrentPage}" Margin="8" />
+        <Grid>
+          <ContentControl Content="{Binding CurrentPage}" Margin="8" />
+
+          <!-- 右上角竖排账号区（PCL2 风格：pill + 大头像 + 用户名） -->
+          <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,18,0"
+                  Background="{DynamicResource CardBackground}"
+                  CornerRadius="16"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1"
+                  Padding="14,10">
+            <StackPanel Orientation="Vertical" Spacing="8">
+              <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
+                <RadioButton Classes="mode-pill" GroupName="AuthMode"
+                             Content="离线"
+                             IsChecked="{Binding Accounts.OfflineMode}" />
+                <RadioButton Classes="mode-pill" GroupName="AuthMode"
+                             Content="正版"
+                             IsChecked="{Binding Accounts.OnlineMode}" />
+              </StackPanel>
+              <Border Width="80" Height="80" CornerRadius="12"
+                      Background="{DynamicResource ContentBackground}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      BorderThickness="1"
+                      HorizontalAlignment="Center">
+                <Image Source="{Binding Accounts.Avatar}"
+                       RenderOptions.BitmapInterpolationMode="None"
+                       Stretch="UniformToFill" />
+              </Border>
+              <TextBlock Text="{Binding Accounts.Username}"
+                         FontSize="14" FontWeight="SemiBold"
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource TextPrimary}" />
+            </StackPanel>
+          </Border>
+        </Grid>
       </Border>
     </Grid>
   </Grid>
