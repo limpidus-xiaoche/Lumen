@@ -4,7 +4,7 @@
 
 | 项目代号 | **`Lumen`（已确认）** |
 |---|---|
-| 文档版本 | **v0.6** — M2 实现落地：下载引擎 / Vanilla 安装 / 任务注册 / 修复；其余沿用 v0.5 约定 |
+| 文档版本 | **v0.7** — M3 实现落地：参数拼装 / Java 选择 / argfile / 进程与会话；其余沿用 v0.5/v0.6 |
 | 日期 | 2026-10-24 |
 | 目标平台 | **v1 = Windows 10/11 x64 only**；跨平台列入 v2 非目标 |
 | 开发者 | A：核心（Core / CLI / 打包）　B：应用（Avalonia UI / 交互 / 生态页面） |
@@ -769,7 +769,7 @@ docs: 契约 v0.5
 - `[B]` 任务中心、进度 UI、**`CancelTaskAsync`/`RetryTaskAsync`**、启动时恢复任务
 - **验收**：装 1.21.x SHA1 全通过；断网续传；重复安装秒完成；中断后可"继续/修复"。
 
-### M3 启动原版（离线）
+### M3 启动原版（离线）（A ✅ 2026-10-24；B 待做）
 
 - `[A]` `ArgumentBuilder`、`ArgFileWriter`（生命周期与编码）、`ProcessRunner`、**`GetRunningSessionsAsync` + 孤儿进程识别**、退出归因
 - `[B]` 实例卡片、启动按钮、实时日志、历史日志列表
@@ -1019,3 +1019,4 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | M1（A）（2026-10-24） | §6.1（rules/合并）、§6.4（Java 探测）、§10 M1 | ManifestClient / VersionResolver / RuleEvaluator / JavaLocator；CLI versions/java/resolve |
 | M1 前端基础模型（2026-10-24） | §4（前端分工）、§10 M1 | 下载页真实 manifest 列表、设置页 Java 列表；App 接真实 `LauncherFacade`；B 负责优化 |
 | M2（A）（2026-10-24） | §5（SkipAssets）、§6.2（下载）、§6.3（安装）、§10 M2 | DownloadEngine / VanillaInstaller / TaskRegistry / 修复；实测 1.12.2 完整安装 |
+| M3（A）（2026-10-24） | §5（Launch/Stop/Sessions）、§6.5（参数/argfile）、§10 M3 | ArgumentBuilder / JavaVersionPolicy / ArgFileWriter / LaunchService；1.21.1 真实启动通过 |

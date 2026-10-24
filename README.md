@@ -33,6 +33,8 @@
 - [x] **M1（B）基础模型**：下载页接真实 manifest 列表、设置页接真实 Java 列表；B 负责优化定稿
 - [x] **M2（A）完成**：下载引擎（分片/续传/SHA1/URL 安全）、Vanilla 安装、install journal、秒装、修复、CLI install/repair
 - [ ] **M2（B）**：任务中心、安装进度 UI、取消/重试、启动恢复（B 负责）
+- [x] **M3（A）完成**：参数拼装/变量展开、Java 选择、argfile 编码与生命周期、进程启动/日志、退出归因、运行会话、CLI launch/stop/sessions
+- [ ] **M3（B）**：实例卡片、启动按钮、实时日志、历史日志（B 负责）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -146,6 +148,20 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 > B 部分（任务中心 UI、进度展示、取消/重试按钮、启动恢复）尚未做；Core 已提供 `TaskRegistry` 与 `CancelTaskAsync/RetryTaskAsync`。
 > 断点续传逻辑已实现（`.part` + `.part.meta` + 分片文件），但本轮未做"中途强杀后续传"的实测。
 
+## M3 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| 真实启动 | `launch test-1.21.1 --username Player` 成功；游戏进入主菜单（日志出现 atlas 创建） |
+| 运行会话 | `sessions` 显示 `pid=83128`；`stop` 后输出"没有运行中的游戏" |
+| 停止 | `stop` 使用 Graceful，游戏打印 `Stopping!`，退出码 **0** |
+| 日志 | stdout/stderr 实时回传；退出归因已接（崩溃报告/退出码） |
+| 测试 | **48 项通过**（Core 43 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+| 已知 | 1.21.1 命令行未超 24K，真实 argfile 启动未覆盖；Java 8 超长命令行未实现 wrapper（报 `E5003`） |
+
+> 离线账号的 Realms 认证会报 `Failed to parse into SignedJWT`，属于预期（没有正版 token），不影响本地游戏。
+
 ## 目标样本
 
 | 启动器 | 路径 | 大小 | 版本 |
@@ -251,4 +267,10 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              VanillaInstaller（client jar/libraries/natives/assets、legacy virtual、磁盘预检、install journal、状态机）；
              TaskRegistry + ThrottledProgress（10Hz）；Facade install/repair/cancel/retry/getTasks；
              CLI install/repair；35 项测试通过；1.21.1（787.6 MB 资源）与 1.12.2 完整安装、秒装、修复均实测通过。
+
+[2026-10-24] M3（A）完成：
+             ArgumentBuilder（legacy/现代参数、rules、变量展开、未解析 E5002、classpath）；
+             JavaVersionPolicy（版本约束 + 1.13+ 64 位过滤）；ArgFileWriter（ANSI/UTF-8、转义、首行后删除、清扫）；
+             LaunchService（进程启动、stdout/stderr、退出归因、RunningSessionStore 持久化）；CLI launch/stop/sessions；
+             48 项测试通过；1.21.1 真实启动、会话可见、Graceful 停止 exit 0 已实测。
 ```

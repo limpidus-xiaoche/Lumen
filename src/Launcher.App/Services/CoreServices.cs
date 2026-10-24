@@ -2,6 +2,7 @@ using Launcher.Core;
 using Launcher.Core.Download;
 using Launcher.Core.Install;
 using Launcher.Core.Java;
+using Launcher.Core.Launch;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
 using Launcher.Protocol;
@@ -35,12 +36,21 @@ public sealed class CoreServices
         var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
         var manifest = new ManifestClient(paths);
         var resolver = new VersionResolver(manifest);
+        var javaLocator = new JavaLocator(paths);
         var installer = new VanillaInstaller(
             paths,
             resolver,
             new DownloadEngine(),
             sqlite,
             loggerFactory.CreateLogger<VanillaInstaller>());
+        var launcher = new LaunchService(
+            paths,
+            settings,
+            sqlite,
+            resolver,
+            javaLocator,
+            new RunningSessionStore(paths),
+            loggerFactory.CreateLogger<LaunchService>());
 
         var facade = new LauncherFacade(
             paths,
@@ -48,9 +58,10 @@ public sealed class CoreServices
             sqlite,
             loggerFactory.CreateLogger<LauncherFacade>(),
             manifest,
-            new JavaLocator(paths),
+            javaLocator,
             installer,
-            new TaskRegistry());
+            new TaskRegistry(),
+            launcher);
 
         return new CoreServices(paths, facade);
     }

@@ -4,6 +4,7 @@ using Launcher.Core.Auth;
 using Launcher.Core.Download;
 using Launcher.Core.Install;
 using Launcher.Core.Java;
+using Launcher.Core.Launch;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
 using Launcher.Protocol;
@@ -25,6 +26,14 @@ var installer = new VanillaInstaller(
     new DownloadEngine(),
     sqlite,
     NullLogger<VanillaInstaller>.Instance);
+var launcher = new LaunchService(
+    launcherPaths,
+    settingsStore,
+    sqlite,
+    resolver,
+    javaLocator,
+    new RunningSessionStore(launcherPaths),
+    NullLogger<LaunchService>.Instance);
 var facade = new LauncherFacade(
     launcherPaths,
     settingsStore,
@@ -33,7 +42,8 @@ var facade = new LauncherFacade(
     manifestClient,
     javaLocator,
     installer,
-    new TaskRegistry());
+    new TaskRegistry(),
+    launcher);
 
 var root = new RootCommand("Lumen CLI");
 
@@ -179,6 +189,75 @@ repairCommand.SetAction(result =>
     Console.WriteLine($"repaired id={instanceId}");
 });
 
+var launchInstanceArgument = new Argument<string>("instance")
+{
+    Description = "要启动的实例 ID",
+};
+var launchUsernameOption = new Option<string>("--username")
+{
+    Description = "离线用户名（默认 Player）",
+};
+
+var launchCommand = new Command("launch", "启动实例（离线账号）");
+launchCommand.Arguments.Add(launchInstanceArgument);
+launchCommand.Options.Add(launchUsernameOption);
+launchCommand.SetAction(result =>
+{
+    var instanceId = result.GetValue(launchInstanceArgument)
+        ?? throw new ArgumentException("缺少实例 ID");
+    var username = result.GetValue(launchUsernameOption) ?? "Player";
+
+    var events = new Progress<LaunchEvent>(e =>
+    {
+        if (e.Kind is LaunchEventKind.Stdout or LaunchEventKind.Stderr)
+        {
+            Console.WriteLine(e.Line);
+        }
+        else if (e.Kind == LaunchEventKind.Exited)
+        {
+            Console.WriteLine(e.CrashHint ?? e.Line);
+        }
+    });
+
+    var session = launcher.LaunchAsync(instanceId, username, events, CancellationToken.None)
+        .GetAwaiter().GetResult();
+    Console.WriteLine($"pid={session.ProcessId}");
+    var code = session.ExitTask.GetAwaiter().GetResult();
+    Console.WriteLine($"exit={code}");
+});
+
+var stopInstanceArgument = new Argument<string>("instance")
+{
+    Description = "要停止的实例 ID",
+};
+
+var stopCommand = new Command("stop", "停止实例");
+stopCommand.Arguments.Add(stopInstanceArgument);
+stopCommand.SetAction(result =>
+{
+    var instanceId = result.GetValue(stopInstanceArgument)
+        ?? throw new ArgumentException("缺少实例 ID");
+    launcher.StopGameAsync(instanceId, StopMode.Graceful, CancellationToken.None)
+        .GetAwaiter().GetResult();
+    Console.WriteLine($"stopped id={instanceId}");
+});
+
+var sessionsCommand = new Command("sessions", "列出运行中的游戏");
+sessionsCommand.SetAction(_ =>
+{
+    var sessions = launcher.GetRunningSessionsAsync(CancellationToken.None).GetAwaiter().GetResult();
+    if (sessions.Count == 0)
+    {
+        Console.WriteLine("没有运行中的游戏。");
+        return;
+    }
+
+    foreach (var session in sessions)
+    {
+        Console.WriteLine($"{session.InstanceId}\tpid={session.ProcessId}\t{session.VersionId}");
+    }
+});
+
 root.Subcommands.Add(offlineUuid);
 root.Subcommands.Add(pathsCommand);
 root.Subcommands.Add(versionsCommand);
@@ -186,5 +265,8 @@ root.Subcommands.Add(javaCommand);
 root.Subcommands.Add(resolveCommand);
 root.Subcommands.Add(installCommand);
 root.Subcommands.Add(repairCommand);
+root.Subcommands.Add(launchCommand);
+root.Subcommands.Add(stopCommand);
+root.Subcommands.Add(sessionsCommand);
 
 return root.Parse(args).Invoke();

@@ -2,6 +2,7 @@ using System.IO.Compression;
 using Launcher.Core.Auth;
 using Launcher.Core.Install;
 using Launcher.Core.Java;
+using Launcher.Core.Launch;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
 using Launcher.Protocol;
@@ -18,6 +19,7 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly ManifestClient? _manifestClient;
     private readonly JavaLocator? _javaLocator;
     private readonly VanillaInstaller? _installer;
+    private readonly LaunchService? _launcher;
     private readonly TaskRegistry _tasks;
 
     public LauncherFacade(
@@ -28,7 +30,8 @@ public sealed class LauncherFacade : ILauncherFacade
         ManifestClient? manifestClient = null,
         JavaLocator? javaLocator = null,
         VanillaInstaller? installer = null,
-        TaskRegistry? tasks = null)
+        TaskRegistry? tasks = null,
+        LaunchService? launcher = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
@@ -38,6 +41,7 @@ public sealed class LauncherFacade : ILauncherFacade
         _javaLocator = javaLocator;
         _installer = installer;
         _tasks = tasks ?? new TaskRegistry();
+        _launcher = launcher;
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
@@ -182,15 +186,36 @@ public sealed class LauncherFacade : ILauncherFacade
         ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
         throw new NotSupportedException("M0 未实现整合包安装。");
 
-    public Task<GameSession> LaunchAsync(
-        string instanceId, IProgress<LaunchEvent> events, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现游戏启动。");
+    public async Task<GameSession> LaunchAsync(
+        string instanceId, IProgress<LaunchEvent> events, CancellationToken ct)
+    {
+        if (_launcher is null)
+        {
+            throw new NotSupportedException("启动服务未注入。");
+        }
 
-    public Task StopGameAsync(string instanceId, StopMode mode, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现游戏结束。");
+        return await _launcher.LaunchAsync(instanceId, username: null, events, ct);
+    }
 
-    public Task<IReadOnlyList<RunningSession>> GetRunningSessionsAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<RunningSession>>(Array.Empty<RunningSession>());
+    public Task StopGameAsync(string instanceId, StopMode mode, CancellationToken ct)
+    {
+        if (_launcher is null)
+        {
+            throw new NotSupportedException("启动服务未注入。");
+        }
+
+        return _launcher.StopGameAsync(instanceId, mode, ct);
+    }
+
+    public Task<IReadOnlyList<RunningSession>> GetRunningSessionsAsync(CancellationToken ct)
+    {
+        if (_launcher is null)
+        {
+            return Task.FromResult<IReadOnlyList<RunningSession>>([]);
+        }
+
+        return _launcher.GetRunningSessionsAsync(ct);
+    }
 
     public Task<AccountSummary> LoginAsync(
         LoginRequest request, IProgress<LoginEvent> progress, CancellationToken ct)
