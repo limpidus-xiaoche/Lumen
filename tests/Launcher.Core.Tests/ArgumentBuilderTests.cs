@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Launcher.Core.Launch;
 using Launcher.Core.Meta;
 using Xunit;
@@ -36,7 +36,7 @@ public sealed class ArgumentBuilderTests
 
         var command = ArgumentBuilder.Build(
             version, ["lib.jar", "client.jar"], @"C:\game", @"C:\assets", "1.12",
-            @"C:\natives", @"C:\libs", Variables, 2048, string.Empty, false);
+            @"C:\natives", @"C:\libs", Variables, 2048, [], false);
 
         Assert.Equal("net.minecraft.launchwrapper.Launch", command.MainClass);
         Assert.Contains("--username", command.Args);
@@ -66,7 +66,7 @@ public sealed class ArgumentBuilderTests
 
         var command = ArgumentBuilder.Build(
             version, ["a.jar"], @"C:\game", @"C:\assets", "17",
-            @"C:\natives", @"C:\libs", Variables, 4096, string.Empty, true);
+            @"C:\natives", @"C:\libs", Variables, 4096, [], true);
 
         Assert.Contains("--win", command.Args);
         Assert.Contains("-cp", command.Args);
@@ -88,7 +88,7 @@ public sealed class ArgumentBuilderTests
 
         var ex = Assert.Throws<LaunchException>(() => ArgumentBuilder.Build(
             version, ["a.jar"], @"C:\game", @"C:\assets", "17",
-            @"C:\natives", @"C:\libs", Variables, 4096, string.Empty, false));
+            @"C:\natives", @"C:\libs", Variables, 4096, [], false));
 
         Assert.Equal("E5002", ex.ErrorCode);
     }

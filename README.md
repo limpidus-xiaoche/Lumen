@@ -35,6 +35,8 @@
 - [ ] **M2（B）**：任务中心、安装进度 UI、取消/重试、启动恢复（B 负责）
 - [x] **M3（A）完成**：参数拼装/变量展开、Java 选择、argfile 编码与生命周期、进程启动/日志、退出归因、运行会话、CLI launch/stop/sessions
 - [ ] **M3（B）**：实例卡片、启动按钮、实时日志、历史日志（B 负责）
+- [x] **M4（A）完成**：账户存储（DPAPI 整文件加密）、微软 Device Code + 自动刷新、authlib-injector 外置登录、启动凭据注入、CLI `login/accounts/use/logout/instances`
+- [ ] **M4（B）**：账户页、登录流程、换机后重新登录引导（B 负责）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -278,4 +280,15 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 [2026-10-24] 默认游戏语言：
              `GameOptions.EnsureDefaultLanguage` 在安装与启动前检查 `options.txt`，缺失时写入 `lang:zh_cn`；
              已有文件不覆盖（尊重用户改动）；当前实例已修正并在实机启动/退出后验证仍为 zh_cn；测试增至 50 项。
+
+[2026-10-24] M4（A）完成：
+             AccountStore（%LOCALAPPDATA%\Lumen\accounts.dat，整文件 DPAPI 加密，accounts[] + active_id 持久化）；
+             MicrosoftAuth（Device Code → XBL → XSTS → Minecraft profile；authorization_pending/slow_down/XErr 处理；
+             refresh 轮换）；AuthlibAuth（authserver/authenticate，https 强校验）+ AuthlibInjector（1.2.8，SHA1 pin）；
+             LaunchService 按激活账户注入凭据（launch --username 可临时覆盖），MSA 剩余 ≤5 分钟自动刷新并回写，
+             外置账户强制 -javaagent（注入器缺失 fail-closed）；
+             CLI 新增 login / accounts / use / logout / instances，launch 默认使用激活账户；
+             ArgumentBuilder 额外 JVM 参数改为列表，支持含空格路径；
+             62 项测试通过（Core 57 / App 4 / Integration 1）；实机以离线账户 Tester 启动 1.21.1，日志显示
+             "Setting user: Tester"，Graceful 停止 exit 0。微软网页授权与外置服务器登录未做真机验证（需用户凭据）。
 ```

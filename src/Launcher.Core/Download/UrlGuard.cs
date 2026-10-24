@@ -32,9 +32,19 @@ public static class UrlGuard
         "api.github.com",
         "objects.githubusercontent.com",
         "raw.githubusercontent.com",
+        "login.microsoftonline.com",
+        "user.auth.xboxlive.com",
+        "xsts.auth.xboxlive.com",
+        "api.minecraftservices.com",
     };
 
-    public static void Validate(string url, bool allowLoopback = false)
+    public static void Validate(string url, bool allowLoopback = false) =>
+        ValidateCore(url, allowLoopback, requireAllowlist: true);
+
+    public static void ValidatePublicHttps(string url) =>
+        ValidateCore(url, allowLoopback: false, requireAllowlist: false);
+
+    private static void ValidateCore(string url, bool allowLoopback, bool requireAllowlist)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
@@ -58,7 +68,9 @@ public static class UrlGuard
 
         var isLoopbackHost = uri.IsLoopback ||
                              string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase);
-        if (!AllowedHosts.Contains(uri.Host) && !(allowLoopback && isLoopbackHost))
+        if (requireAllowlist &&
+            !AllowedHosts.Contains(uri.Host) &&
+            !(allowLoopback && isLoopbackHost))
         {
             throw new DownloadException("E2001", $"host 不在白名单：{uri.Host}");
         }

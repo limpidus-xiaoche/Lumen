@@ -1,4 +1,6 @@
 using Launcher.Core;
+using Launcher.Core.Accounts;
+using Launcher.Core.Auth;
 using Launcher.Core.Download;
 using Launcher.Core.Install;
 using Launcher.Core.Java;
@@ -37,12 +39,17 @@ public sealed class CoreServices
         var manifest = new ManifestClient(paths);
         var resolver = new VersionResolver(manifest);
         var javaLocator = new JavaLocator(paths);
+        var downloads = new DownloadEngine();
         var installer = new VanillaInstaller(
             paths,
             resolver,
-            new DownloadEngine(),
+            downloads,
             sqlite,
             loggerFactory.CreateLogger<VanillaInstaller>());
+        var accounts = new AccountStore(paths);
+        var microsoft = new MicrosoftAuth();
+        var authlib = new AuthlibAuth();
+        var authlibInjector = new AuthlibInjector(paths, downloads);
         var launcher = new LaunchService(
             paths,
             settings,
@@ -50,7 +57,10 @@ public sealed class CoreServices
             resolver,
             javaLocator,
             new RunningSessionStore(paths),
-            loggerFactory.CreateLogger<LaunchService>());
+            loggerFactory.CreateLogger<LaunchService>(),
+            accounts,
+            microsoft,
+            authlibInjector);
 
         var facade = new LauncherFacade(
             paths,
@@ -61,7 +71,10 @@ public sealed class CoreServices
             javaLocator,
             installer,
             new TaskRegistry(),
-            launcher);
+            launcher,
+            accounts,
+            microsoft,
+            authlib);
 
         return new CoreServices(paths, facade);
     }

@@ -4,7 +4,7 @@
 
 | 项目代号 | **`Lumen`（已确认）** |
 |---|---|
-| 文档版本 | **v0.7** — M3 实现落地：参数拼装 / Java 选择 / argfile / 进程与会话；其余沿用 v0.5/v0.6 |
+| 文档版本 | **v0.8** — M4（A）落地：账户存储 / 微软 Device Code / 外置登录；其余沿用 v0.7 |
 | 日期 | 2026-10-24 |
 | 目标平台 | **v1 = Windows 10/11 x64 only**；跨平台列入 v2 非目标 |
 | 开发者 | A：核心（Core / CLI / 打包）　B：应用（Avalonia UI / 交互 / 生态页面） |
@@ -522,6 +522,12 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 - 微软：Device Code → live token → XBL → XSTS → Minecraft；token 加密存储、自动刷新。
 - 外置：authlib-injector **运行期下载并校验 SHA1**（不随包分发，见 §12），`-javaagent:...=地址`。
   - **SHA1 基准来源**：内置「版本 → SHA1」pin 表（随应用发布更新），只接受表内版本；表外版本一律拒绝（`E6003`）。禁止信任远端返回的 hash。
+- **账户存储（M4 落地）**：`%LOCALAPPDATA%\Lumen\accounts.dat`，整文件 DPAPI（CurrentUser）加密，内含 `accounts[] + active_id`。
+  - 账户 ID：`offline:<uuid>`、`msa:<uuid>`、`authlib:<uuid>@<host>`；`Upsert` 首次写入自动设为激活，`Remove` 移除激活项后顺延到下一个。
+  - **启动凭据优先级**：`launch --username` 临时离线 > 激活账户 > 默认离线 `Player`。
+  - 微软登录成功即刷新 `expires_at`；启动前若剩余 ≤5 分钟且存在 refresh_token，自动刷新并回写 `accounts.dat`。
+  - 外置账户启动时必装 `-javaagent`；缺失注入器直接 `E7001` fail-closed，不静默降级为离线。
+  - 离线/外置 `user_type` = `legacy`/`mojang`，微软 = `msa`；`clientid`/`auth_xuid` 统一传空串（不伪造 XUID）。
 - **脱敏名单（修订）**：`--accessToken`、`clientId`、`refresh_token`、`client secret`、外置登录密码、session token、代理密码、`xuid`。
 
 ### 6.7 Instances（A）
@@ -776,9 +782,9 @@ docs: 契约 v0.5
 - `[B]` 实例卡片、启动按钮、实时日志、历史日志列表
 - **验收**：离线实例进游戏；含空格/中文/引号路径可用；异常退出给出 `E5xxx` 归因。
 
-### M4 账户（收窄）
+### M4 账户（A ✅ 2026-10-24；B 待做）
 
-- `[A]` 微软 Device Code + authlib-injector（运行期下载）+ DPAPI 抽象
+- `[A]` 微软 Device Code + authlib-injector（运行期下载）+ DPAPI 抽象 + 账户存储 + 启动注入 + CLI `login/accounts/use/logout`
 - `[B]` 账户页、登录流程、换机后重新登录引导
 - **验收**：微软登录显示正版名；重启免登录；换机解密失败走重新登录；日志无明文 token。
 

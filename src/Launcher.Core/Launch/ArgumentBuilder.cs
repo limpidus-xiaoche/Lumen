@@ -21,7 +21,7 @@ public static class ArgumentBuilder
         string librariesDir,
         IReadOnlyDictionary<string, string> variables,
         int memoryMb,
-        string extraJvmArgs,
+        IReadOnlyList<string>? extraJvmArgs,
         bool useG1)
     {
         var mainClass = version.MainClass
@@ -77,9 +77,9 @@ public static class ArgumentBuilder
             jvmArgs.Add("-XX:MaxGCPauseMillis=50");
         }
 
-        if (!string.IsNullOrWhiteSpace(extraJvmArgs))
+        if (extraJvmArgs is { Count: > 0 })
         {
-            jvmArgs.AddRange(extraJvmArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            jvmArgs.AddRange(extraJvmArgs);
         }
 
         var args = new List<string>(jvmArgs) { mainClass };

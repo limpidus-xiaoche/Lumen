@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using Launcher.Core.Accounts;
 using Launcher.Core.Auth;
 using Launcher.Core.Install;
 using Launcher.Core.Java;
@@ -21,6 +22,9 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly VanillaInstaller? _installer;
     private readonly LaunchService? _launcher;
     private readonly TaskRegistry _tasks;
+    private readonly AccountStore? _accounts;
+    private readonly MicrosoftAuth? _microsoft;
+    private readonly AuthlibAuth? _authlib;
 
     public LauncherFacade(
         LauncherPaths paths,
@@ -31,7 +35,10 @@ public sealed class LauncherFacade : ILauncherFacade
         JavaLocator? javaLocator = null,
         VanillaInstaller? installer = null,
         TaskRegistry? tasks = null,
-        LaunchService? launcher = null)
+        LaunchService? launcher = null,
+        AccountStore? accounts = null,
+        MicrosoftAuth? microsoft = null,
+        AuthlibAuth? authlib = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
@@ -42,6 +49,9 @@ public sealed class LauncherFacade : ILauncherFacade
         _installer = installer;
         _tasks = tasks ?? new TaskRegistry();
         _launcher = launcher;
+        _accounts = accounts;
+        _microsoft = microsoft;
+        _authlib = authlib;
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
@@ -52,8 +62,8 @@ public sealed class LauncherFacade : ILauncherFacade
         return new LauncherSnapshot(
             settings,
             instances,
-            Array.Empty<AccountSummary>(),
-            ActiveAccountId: null,
+            _accounts?.GetSummaries() ?? Array.Empty<AccountSummary>(),
+            _accounts?.ActiveId,
             javas,
             ManifestUpdatedAt: null,
             AppVersion: typeof(LauncherFacade).Assembly.GetName().Version?.ToString() ?? "0.0.0");
@@ -217,29 +227,97 @@ public sealed class LauncherFacade : ILauncherFacade
         return _launcher.GetRunningSessionsAsync(ct);
     }
 
-    public Task<AccountSummary> LoginAsync(
+    public async Task<AccountSummary> LoginAsync(
         LoginRequest request, IProgress<LoginEvent> progress, CancellationToken ct)
     {
-        if (request.Mode != AuthMode.Offline)
+        if (_accounts is null)
         {
-            throw new NotSupportedException("M0 仅支持离线账户。");
+            throw new NotSupportedException("账户存储未注入。");
         }
 
-        var identity = OfflineAuth.Create(request.Username ?? "Player");
-        progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"离线账户：{identity.Username}"));
-        return Task.FromResult(new AccountSummary(
-            identity.Uuid,
-            AuthMode.Offline,
-            identity.Username,
-            identity.Uuid,
-            AvatarUrl: null,
-            IsActive: true,
-            ExpiresAt: null));
+        StoredAccount account;
+        switch (request.Mode)
+        {
+            case AuthMode.Offline:
+            {
+                var identity = OfflineAuth.Create(
+                    string.IsNullOrWhiteSpace(request.Username) ? "Player" : request.Username.Trim());
+                account = new StoredAccount(
+                    $"offline:{identity.Uuid}", AuthMode.Offline, identity.Username, identity.Uuid,
+                    AvatarUrl: null, identity.AccessToken, RefreshToken: null, ExpiresAt: null);
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"离线账户：{identity.Username}"));
+                break;
+            }
+
+            case AuthMode.Microsoft:
+            {
+                if (_microsoft is null)
+                {
+                    throw new NotSupportedException("Microsoft 登录未注入。");
+                }
+
+                var result = await _microsoft.LoginAsync(progress, ct);
+                account = new StoredAccount(
+                    $"msa:{result.Uuid}", AuthMode.Microsoft, result.Username, result.Uuid,
+                    result.AvatarUrl, result.AccessToken, result.RefreshToken, result.ExpiresAt);
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"Microsoft 账户：{result.Username}"));
+                break;
+            }
+
+            case AuthMode.Authlib:
+            {
+                if (_authlib is null)
+                {
+                    throw new NotSupportedException("外置登录未注入。");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.ServerUrl) ||
+                    string.IsNullOrWhiteSpace(request.Username) ||
+                    string.IsNullOrWhiteSpace(request.Password))
+                {
+                    throw new AuthException("E6005", "外置登录需要服务器地址、用户名与密码。");
+                }
+
+                var result = await _authlib.LoginAsync(
+                    request.ServerUrl, request.Username, request.Password, ct);
+                account = new StoredAccount(
+                    $"authlib:{result.Uuid}@{new Uri(result.ServerUrl).Host}", AuthMode.Authlib,
+                    result.Username, result.Uuid, AvatarUrl: null, result.AccessToken,
+                    RefreshToken: null, ExpiresAt: null, result.ServerUrl, result.ClientToken);
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"外置账户：{result.Username}"));
+                break;
+            }
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(request), request.Mode, "未知的登录方式。");
+        }
+
+        _accounts.Upsert(account);
+        _accounts.SetActive(account.Id);
+        _logger.LogInformation("账户已登录：{Type} {Username}", account.Type, account.Username);
+        return ToSummary(account, isActive: true);
     }
 
-    public Task LogoutAsync(string accountId, CancellationToken ct) => Task.CompletedTask;
+    public Task LogoutAsync(string accountId, CancellationToken ct)
+    {
+        if (_accounts is null)
+        {
+            return Task.CompletedTask;
+        }
 
-    public Task SetActiveAccountAsync(string accountId, CancellationToken ct) => Task.CompletedTask;
+        _accounts.Remove(accountId);
+        _logger.LogInformation("账户已移除：{AccountId}", accountId);
+        return Task.CompletedTask;
+    }
+
+    public Task SetActiveAccountAsync(string accountId, CancellationToken ct)
+    {
+        _accounts?.SetActive(accountId);
+        return Task.CompletedTask;
+    }
+
+    private static AccountSummary ToSummary(StoredAccount account, bool isActive) =>
+        new(account.Id, account.Type, account.Username, account.Uuid, account.AvatarUrl, isActive, account.ExpiresAt);
 
     public Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<ModEntry>>(Array.Empty<ModEntry>());
