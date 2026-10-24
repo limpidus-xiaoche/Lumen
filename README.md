@@ -31,6 +31,8 @@
 - [ ] B 接管 App：在 `feat/ui-m0` 分支确认或重写脚手架，并在提交信息中说明
 - [x] **M1（A）完成**：manifest（含 `latest` 解析）、version.json、rules、`inheritsFrom` 合并、Java 探测（32/64 注册表）
 - [x] **M1（B）基础模型**：下载页接真实 manifest 列表、设置页接真实 Java 列表；B 负责优化定稿
+- [x] **M2（A）完成**：下载引擎（分片/续传/SHA1/URL 安全）、Vanilla 安装、install journal、秒装、修复、CLI install/repair
+- [ ] **M2（B）**：任务中心、安装进度 UI、取消/重试、启动恢复（B 负责）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -128,6 +130,21 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | GUI 冒烟（真实 Core） | `Lumen.exe` 启动，SQLite 初始化成功，日志无错误 |
 
 > B 部分只做了基础模型（数据绑定 + 列表），视觉与交互仍由 B 优化定稿。
+
+## M2 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| `install 1.21.1 --skip-assets` | 成功；70 个库；客户端 jar SHA1 与 manifest 一致 |
+| `install 1.12.2`（完整资源） | 成功；1290 个 asset、105 个库文件、11 个 native；客户端 SHA1 一致 |
+| 秒装 | 重复安装 1.12.2（含资源）**1.61s**；1.21.1（跳过资源）**1.14s** |
+| 修复 | 删除 `patchy-1.3.9.jar` 后 `repair test-1.12.2`，**3.78s** 恢复 |
+| 测试 | **35 项通过**（Core 30 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+| 安全 | URL 校验：仅 https、host 白名单、私网/环回拒绝、重定向逐跳复检；单测覆盖 |
+
+> B 部分（任务中心 UI、进度展示、取消/重试按钮、启动恢复）尚未做；Core 已提供 `TaskRegistry` 与 `CancelTaskAsync/RetryTaskAsync`。
+> 断点续传逻辑已实现（`.part` + `.part.meta` + 分片文件），但本轮未做"中途强杀后续传"的实测。
 
 ## 目标样本
 
@@ -228,4 +245,10 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              App 改用真实 LauncherFacade（CoreServices 组装路径/设置/SQLite/manifest/Java）；
              下载页加载 manifest 并列出真实版本；设置页加载并显示本机 Java；
              新增 2 项 ViewModel 测试（总计 28 项）；视觉与交互待 B 优化。
+
+[2026-10-24] M2（A）完成：
+             DownloadEngine（16MB 阈值分片、8MB/片、Range 续传、顺序 SHA1、镜像回退、URL 安全校验、逐跳重定向）；
+             VanillaInstaller（client jar/libraries/natives/assets、legacy virtual、磁盘预检、install journal、状态机）；
+             TaskRegistry + ThrottledProgress（10Hz）；Facade install/repair/cancel/retry/getTasks；
+             CLI install/repair；35 项测试通过；1.12.2 完整安装 + 秒装 + 修复已实测。
 ```

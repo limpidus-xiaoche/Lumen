@@ -4,7 +4,7 @@
 
 | 项目代号 | **`Lumen`（已确认）** |
 |---|---|
-| 文档版本 | **v0.5** — 复审回写：CmlLib 边界、协作身份、许可存证、编码/源/任务/SSRF 等 |
+| 文档版本 | **v0.6** — M2 实现落地：下载引擎 / Vanilla 安装 / 任务注册 / 修复；其余沿用 v0.5 约定 |
 | 日期 | 2026-10-24 |
 | 目标平台 | **v1 = Windows 10/11 x64 only**；跨平台列入 v2 非目标 |
 | 开发者 | A：核心（Core / CLI / 打包）　B：应用（Avalonia UI / 交互 / 生态页面） |
@@ -245,7 +245,8 @@ public sealed record InstallRequest(
     LoaderKind Loader,
     string? LoaderVersion,
     IsolationLevel Isolation,
-    InstallMode Mode);           // New | Reinstall | ChangeLoader
+    InstallMode Mode,            // New | Reinstall | ChangeLoader
+    bool SkipAssets = false);    // 仅 CLI 快速验证使用；UI 默认 false
 
 public sealed record UpdateInstanceRequest(
     string? DisplayName, string? VersionId, LoaderKind? Loader,
@@ -358,6 +359,7 @@ public enum DownloadSourceMode { Auto, Official, Mirror }
 | v0.3 | 2026-10-24 | 决策定稿：不签名仅 SHA-256；MIT；GitHub 私有；bangbang93 为发布门禁 | 决策 |
 | v0.4 | 2026-10-24 | 补 `StopGameAsync/GetTasksAsync/GetInstanceAsync/SetActiveAccountAsync`；`LoginRequest` 显式 `AuthMode`；`ImportExternalAsync` 带进度；明确回调线程与节流 | 评审反馈 |
 | v0.5 | 2026-10-24 | 补 `CancelTaskAsync/RetryTaskAsync/GetRunningSessionsAsync`；补齐全部 DTO 字段与枚举；明确 CmlLib 能力边界与 M0 门禁 | 复审反馈 |
+| v0.6 | 2026-10-24 | `InstallRequest.SkipAssets`（仅 CLI 快速验证）；M2 下载/安装/任务实现 | M2 |
 
 ---
 
@@ -761,7 +763,7 @@ docs: 契约 v0.5
 - `[B]` 下载页版本列表、设置页 Java 列表
 - **验收**：列出全部版本与本机 JDK（含仅 32 位的旧 JRE）。
 
-### M2 原版安装
+### M2 原版安装（A ✅ 2026-10-24；B 待做）
 
 - `[A]` 下载引擎（阈值分片/顺序哈希/失败分类/续传 meta/持久队列/磁盘预检/URL 安全校验）+ Vanilla 安装 + journal + 修复
 - `[B]` 任务中心、进度 UI、**`CancelTaskAsync`/`RetryTaskAsync`**、启动时恢复任务
@@ -1016,3 +1018,4 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | M0 归属（2026-10-24） | §4（M0 例外）、§10 M0（B 接管项） | App 脚手架由 A 代搭，B 接管后只由 B 修改 |
 | M1（A）（2026-10-24） | §6.1（rules/合并）、§6.4（Java 探测）、§10 M1 | ManifestClient / VersionResolver / RuleEvaluator / JavaLocator；CLI versions/java/resolve |
 | M1 前端基础模型（2026-10-24） | §4（前端分工）、§10 M1 | 下载页真实 manifest 列表、设置页 Java 列表；App 接真实 `LauncherFacade`；B 负责优化 |
+| M2（A）（2026-10-24） | §5（SkipAssets）、§6.2（下载）、§6.3（安装）、§10 M2 | DownloadEngine / VanillaInstaller / TaskRegistry / 修复；实测 1.12.2 完整安装 |

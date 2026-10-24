@@ -1,14 +1,39 @@
 using System.CommandLine;
+using Launcher.Core;
 using Launcher.Core.Auth;
+using Launcher.Core.Download;
+using Launcher.Core.Install;
 using Launcher.Core.Java;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
+using Launcher.Protocol;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 var launcherPaths = LauncherPaths.CreateDefault(LauncherPaths.IsPortableRequested(args));
 launcherPaths.EnsureCreated();
 var manifestClient = new ManifestClient(launcherPaths);
 var resolver = new VersionResolver(manifestClient);
 var javaLocator = new JavaLocator(launcherPaths);
+
+var settingsStore = new AppSettingsStore(launcherPaths);
+var sqlite = new SqliteStore(launcherPaths);
+sqlite.InitializeAsync().GetAwaiter().GetResult();
+var installer = new VanillaInstaller(
+    launcherPaths,
+    resolver,
+    new DownloadEngine(),
+    sqlite,
+    NullLogger<VanillaInstaller>.Instance);
+var facade = new LauncherFacade(
+    launcherPaths,
+    settingsStore,
+    sqlite,
+    NullLogger<LauncherFacade>.Instance,
+    manifestClient,
+    javaLocator,
+    installer,
+    new TaskRegistry());
 
 var root = new RootCommand("Lumen CLI");
 
@@ -93,10 +118,73 @@ resolveCommand.SetAction(result =>
     Console.WriteLine($"javaMajor={detail.JavaVersion?.MajorVersion}");
 });
 
+var installVersionArgument = new Argument<string>("version")
+{
+    Description = "要安装的版本 ID，例如 1.21.1",
+};
+var installInstanceOption = new Option<string>("--instance")
+{
+    Description = "实例 ID（默认 vanilla-<version>）",
+};
+var installNameOption = new Option<string>("--name")
+{
+    Description = "实例显示名（默认使用版本 ID）",
+};
+var skipAssetsOption = new Option<bool>("--skip-assets")
+{
+    Description = "跳过资源文件下载（仅用于快速验证）",
+};
+
+var installCommand = new Command("install", "安装原版实例");
+installCommand.Arguments.Add(installVersionArgument);
+installCommand.Options.Add(installInstanceOption);
+installCommand.Options.Add(installNameOption);
+installCommand.Options.Add(skipAssetsOption);
+installCommand.SetAction(result =>
+{
+    var version = result.GetValue(installVersionArgument);
+    if (string.IsNullOrWhiteSpace(version))
+    {
+        Console.Error.WriteLine("缺少版本 ID");
+        return;
+    }
+
+    var instanceId = result.GetValue(installInstanceOption) ?? $"vanilla-{version}";
+    var name = result.GetValue(installNameOption) ?? version;
+    var request = new InstallRequest(
+        instanceId, name, version, LoaderKind.Vanilla, null,
+        IsolationLevel.ModsConfig, InstallMode.New, result.GetValue(skipAssetsOption));
+
+    var progress = new Progress<InstallProgress>(p =>
+        Console.WriteLine($"[{p.Stage}] {p.Percent:F1}% {p.Message}"));
+
+    var summary = facade.InstallAsync(request, progress, CancellationToken.None).GetAwaiter().GetResult();
+    Console.WriteLine($"installed id={summary.Id} state={summary.State}");
+});
+
+var repairInstanceArgument = new Argument<string>("instance")
+{
+    Description = "要修复的实例 ID",
+};
+
+var repairCommand = new Command("repair", "修复实例（按 SHA1 重下缺失文件）");
+repairCommand.Arguments.Add(repairInstanceArgument);
+repairCommand.SetAction(result =>
+{
+    var instanceId = result.GetValue(repairInstanceArgument)
+        ?? throw new ArgumentException("缺少实例 ID");
+    var progress = new Progress<InstallProgress>(p =>
+        Console.WriteLine($"[{p.Stage}] {p.Percent:F1}% {p.Message}"));
+    facade.RepairInstanceAsync(instanceId, progress, CancellationToken.None).GetAwaiter().GetResult();
+    Console.WriteLine($"repaired id={instanceId}");
+});
+
 root.Subcommands.Add(offlineUuid);
 root.Subcommands.Add(pathsCommand);
 root.Subcommands.Add(versionsCommand);
 root.Subcommands.Add(javaCommand);
 root.Subcommands.Add(resolveCommand);
+root.Subcommands.Add(installCommand);
+root.Subcommands.Add(repairCommand);
 
 return root.Parse(args).Invoke();

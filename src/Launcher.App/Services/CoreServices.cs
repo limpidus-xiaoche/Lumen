@@ -1,4 +1,6 @@
 using Launcher.Core;
+using Launcher.Core.Download;
+using Launcher.Core.Install;
 using Launcher.Core.Java;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
@@ -31,13 +33,24 @@ public sealed class CoreServices
         sqlite.InitializeAsync().GetAwaiter().GetResult();
 
         var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
+        var manifest = new ManifestClient(paths);
+        var resolver = new VersionResolver(manifest);
+        var installer = new VanillaInstaller(
+            paths,
+            resolver,
+            new DownloadEngine(),
+            sqlite,
+            loggerFactory.CreateLogger<VanillaInstaller>());
+
         var facade = new LauncherFacade(
             paths,
             settings,
             sqlite,
             loggerFactory.CreateLogger<LauncherFacade>(),
-            new ManifestClient(paths),
-            new JavaLocator(paths));
+            manifest,
+            new JavaLocator(paths),
+            installer,
+            new TaskRegistry());
 
         return new CoreServices(paths, facade);
     }

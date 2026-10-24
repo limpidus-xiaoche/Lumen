@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Launcher.Core.Auth;
+using Launcher.Core.Install;
 using Launcher.Core.Java;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
@@ -16,6 +17,8 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly ILogger<LauncherFacade> _logger;
     private readonly ManifestClient? _manifestClient;
     private readonly JavaLocator? _javaLocator;
+    private readonly VanillaInstaller? _installer;
+    private readonly TaskRegistry _tasks;
 
     public LauncherFacade(
         LauncherPaths paths,
@@ -23,7 +26,9 @@ public sealed class LauncherFacade : ILauncherFacade
         SqliteStore sqlite,
         ILogger<LauncherFacade> logger,
         ManifestClient? manifestClient = null,
-        JavaLocator? javaLocator = null)
+        JavaLocator? javaLocator = null,
+        VanillaInstaller? installer = null,
+        TaskRegistry? tasks = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
@@ -31,6 +36,8 @@ public sealed class LauncherFacade : ILauncherFacade
         _logger = logger;
         _manifestClient = manifestClient;
         _javaLocator = javaLocator;
+        _installer = installer;
+        _tasks = tasks ?? new TaskRegistry();
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
@@ -80,25 +87,96 @@ public sealed class LauncherFacade : ILauncherFacade
     }
 
     public Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<TaskInfo>>(Array.Empty<TaskInfo>());
+        Task.FromResult(_tasks.Snapshot());
 
-    public Task CancelTaskAsync(string taskId, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现任务取消。");
+    public Task CancelTaskAsync(string taskId, CancellationToken ct)
+    {
+        if (!_tasks.Cancel(taskId))
+        {
+            throw new KeyNotFoundException($"任务不存在：{taskId}");
+        }
 
-    public Task RetryTaskAsync(string taskId, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现任务重试。");
+        return Task.CompletedTask;
+    }
 
-    public Task<InstanceSummary> InstallAsync(
+    public Task RetryTaskAsync(string taskId, CancellationToken ct)
+    {
+        if (!_tasks.Retry(taskId))
+        {
+            throw new KeyNotFoundException($"任务不存在或不可重试：{taskId}");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async Task<InstanceSummary> InstallAsync(
+        InstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        if (_installer is null)
+        {
+            throw new NotSupportedException("安装器未注入。");
+        }
+
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var taskId = _tasks.Start(
+            TaskKind.Install,
+            request.InstanceId,
+            cts,
+            token => RunInstallAsync(request, new Progress<InstallProgress>(), token));
+
+        var throttled = new ThrottledProgress(
+            progress,
+            p => _tasks.Report(taskId, p.Percent, p.Message));
+
+        try
+        {
+            var result = await RunInstallAsync(request, throttled, cts.Token);
+            _tasks.Complete(taskId, TaskState.Succeeded, message: "安装完成");
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            _tasks.Complete(taskId, TaskState.Cancelled, message: "已取消");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _tasks.Complete(taskId, TaskState.Failed, "E3003", ex.Message);
+            throw;
+        }
+        finally
+        {
+            cts.Dispose();
+        }
+    }
+
+    private Task<InstanceSummary> RunInstallAsync(
         InstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现安装。");
+        _installer!.InstallAsync(request, progress, ct);
 
     public Task UpdateInstanceAsync(
         string instanceId, UpdateInstanceRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现实例更新。");
+        throw new NotSupportedException("M2 未实现实例更新。");
 
-    public Task RepairInstanceAsync(
-        string instanceId, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现实例修复。");
+    public async Task RepairInstanceAsync(
+        string instanceId, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        if (_installer is null)
+        {
+            throw new NotSupportedException("安装器未注入。");
+        }
+
+        var instances = await _sqlite.GetInstancesAsync(ct);
+        var instance = instances.FirstOrDefault(i => i.Id == instanceId)
+            ?? throw new KeyNotFoundException($"实例不存在：{instanceId}");
+
+        await _sqlite.UpdateInstanceStateAsync(instanceId, InstanceState.Repairing, ct);
+        var request = new InstallRequest(
+            instance.Id, instance.Name, instance.VersionId,
+            instance.Loader, instance.LoaderVersion, instance.Isolation,
+            InstallMode.Reinstall);
+        await InstallAsync(request, progress, ct);
+    }
 
     public Task<InstanceSummary> InstallModpackAsync(
         ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>

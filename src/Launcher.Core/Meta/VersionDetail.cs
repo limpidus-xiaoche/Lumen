@@ -26,6 +26,8 @@ public sealed class AssetIndexRef
     [JsonPropertyName("size")] public long Size { get; set; }
     [JsonPropertyName("totalSize")] public long TotalSize { get; set; }
     [JsonPropertyName("url")] public string? Url { get; set; }
+    [JsonPropertyName("virtual")] public bool Virtual { get; set; }
+    [JsonPropertyName("map_to_resources")] public bool MapToResources { get; set; }
 }
 
 public sealed class VersionDownloads
@@ -36,6 +38,7 @@ public sealed class VersionDownloads
 
 public sealed class DownloadArtifact
 {
+    [JsonPropertyName("path")] public string? Path { get; set; }
     [JsonPropertyName("sha1")] public string? Sha1 { get; set; }
     [JsonPropertyName("size")] public long Size { get; set; }
     [JsonPropertyName("url")] public string? Url { get; set; }

@@ -49,7 +49,8 @@ public sealed record InstallRequest(
     LoaderKind Loader,
     string? LoaderVersion,
     IsolationLevel Isolation,
-    InstallMode Mode);
+    InstallMode Mode,
+    bool SkipAssets = false);
 
 public sealed record UpdateInstanceRequest(
     string? DisplayName,
