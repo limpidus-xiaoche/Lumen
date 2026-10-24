@@ -62,12 +62,13 @@ public sealed class FakeLauncherFacade : ILauncherFacade
             InstallStage.Natives, InstallStage.Assets, InstallStage.Loader, InstallStage.Finalizing,
         };
 
+        // 契约约定：Fake 每 200ms 报一次假进度；前期阶段总量未知，Percent = -1（不确定态）
         for (var i = 0; i < stages.Length; i++)
         {
-            var percent = (i + 1) * 100d / stages.Length;
+            var percent = i < 2 ? -1 : (i + 1) * 100d / stages.Length;
             progress.Report(new InstallProgress(
                 stages[i], percent, 0, 0, 0, null, $"模拟安装：{stages[i]}"));
-            await Task.Delay(120, ct);
+            await Task.Delay(200, ct);
         }
 
         progress.Report(new InstallProgress(InstallStage.Done, 100, 0, 0, 0, null, "模拟安装完成"));

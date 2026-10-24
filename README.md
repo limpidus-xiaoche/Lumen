@@ -191,4 +191,11 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 [2026-10-24] 协作方式临时调整：`ttss4096` 账号暂不可用，继续使用仓库 deploy key 推送；
              工作流改为「推 feat/* 分支 → owner 在网页端合并」，不直推 main；
              账号恢复后再迁移到 collaborators + 用户级 SSH，deploy key 降为 CI 只读。
+
+[2026-10-24] B（UI）M0 深化（feat/ui-m0）：
+             深/浅双主题资源字典（App.axaml，全部颜色 DynamicResource，可一键换肤）；
+             主窗口框架：左侧导航栏 + 内容区，选中高亮，底部低调水印「麦谷 & Limpidus」；
+             设置页新增深色模式切换（M0 占位，直接生效）；FakeLauncherFacade 进度对齐契约
+             （200ms/次，前两阶段 Percent=-1 不确定态）；build 0 警告 0 错误，App.Tests 2 项通过；
+             hook 生效验证：直推 main 被本地拒绝；待 owner 网页端合并 feat/ui-m0。
 ```
