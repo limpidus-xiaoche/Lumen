@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:chrome="using:Avalonia.Controls.Chrome"
+        xmlns:views="using:Launcher.App.Views"
         x:Class="Launcher.App.MainWindow"
         Title="Lumen"
         Width="820"
@@ -84,12 +85,55 @@
 
     <!-- 自定义标题栏（PCL2 风格：无系统标题栏，Logo 居左，账号区+关闭按钮居右） -->
     <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="0,0,0,1"
             chrome:WindowDecorationProperties.ElementRole="TitleBar">
       <DockPanel LastChildFill="False">
 
-        <!-- 左侧：作者标识（简洁两行：品牌 + 定位） -->
-        <StackPanel DockPanel.Dock="Left" Margin="16,0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Border Width="14" Height="14" CornerRadius="3" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+        <!-- 左侧：末影龙头 Logo + 品牌标识 -->
+        <StackPanel DockPanel.Dock="Left" Margin="14,0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+          <Viewbox Width="32" Height="32" VerticalAlignment="Center">
+            <Canvas Width="32" Height="32">
+              <!-- 头部背后的紫色微光 -->
+              <Ellipse Width="26" Height="24" Canvas.Left="3" Canvas.Top="5" Fill="#33A275F5" />
+              <!-- 体素龙首：方形吻部 + 阶梯轮廓 -->
+              <Path Data="M10 9 L22 9 L22 11 L24 11 L24 17 L23 17 L23 24 L20 24 L20 27 L12 27 L12 24 L9 24 L9 17 L8 17 L8 11 L10 11 Z"
+                    Fill="#1B1426"
+                    Stroke="{DynamicResource AccentBrush}"
+                    StrokeThickness="1.2"
+                    StrokeJoin="Miter" />
+              <!-- 左侧长角：分段上弯，角尖灰白 -->
+              <Path Data="M10 9 L8 8 L8 6 L6 6 L6 4"
+                    Stroke="{DynamicResource AccentBrush}"
+                    StrokeThickness="1.6"
+                    StrokeLineCap="Square"
+                    Fill="Transparent" />
+              <Path Data="M6 4 L4 4 L4 2"
+                    Stroke="#D6CCE4"
+                    StrokeThickness="1.6"
+                    StrokeLineCap="Square"
+                    Fill="Transparent" />
+              <!-- 右侧长角 -->
+              <Path Data="M22 9 L24 8 L24 6 L26 6 L26 4"
+                    Stroke="{DynamicResource AccentBrush}"
+                    StrokeThickness="1.6"
+                    StrokeLineCap="Square"
+                    Fill="Transparent" />
+              <Path Data="M26 4 L28 4 L28 2"
+                    Stroke="#D6CCE4"
+                    StrokeThickness="1.6"
+                    StrokeLineCap="Square"
+                    Fill="Transparent" />
+              <!-- 一双紫色方眼 -->
+              <Rectangle Canvas.Left="11.5" Canvas.Top="14" Width="3" Height="3" Fill="{DynamicResource AccentGlow}" />
+              <Rectangle Canvas.Left="17.5" Canvas.Top="14" Width="3" Height="3" Fill="{DynamicResource AccentGlow}" />
+              <!-- 吻部横线 -->
+              <Path Data="M12.5 21.5 L19.5 21.5"
+                    Stroke="#5A4A78"
+                    StrokeThickness="1"
+                    Fill="Transparent" />
+            </Canvas>
+          </Viewbox>
           <StackPanel VerticalAlignment="Center" Spacing="-2">
             <TextBlock Text="麦谷Limpidus" FontSize="16" FontWeight="Bold"
                        Foreground="{DynamicResource AccentGlow}" />
@@ -214,9 +258,11 @@
         </DockPanel>
       </Border>
 
-      <!-- 右侧页面内容 -->
+      <!-- 右侧页面内容：末端影环境光 + 漂浮微粒子垫底 -->
       <Border Grid.Column="1" Background="{DynamicResource ContentBackground}">
         <Grid>
+          <Border Background="{DynamicResource AmbientGlow}" IsHitTestVisible="False" />
+          <views:EnderParticles Opacity="0.55" IsHitTestVisible="False" />
           <ContentControl Content="{Binding CurrentPage}" Margin="8" />
         </Grid>
       </Border>
