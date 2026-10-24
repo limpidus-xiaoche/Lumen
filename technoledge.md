@@ -690,8 +690,13 @@ CREATE TABLE install_journal(
 ### 9.0 仓库与权限（已确认）
 
 - 托管：**GitHub 私有仓库** `limpidus-xiaoche/Lumen`（已推送首个提交）。
-- **身份模型（修正）**：两位开发者由 owner 加为 **collaborators**，各自使用自己的**用户级 SSH key**；提交邮箱必须与各自 GitHub 账号邮箱一致，否则提交/PR 无法归属。
-- **Deploy key 只给 CI，且只读**：当前这把 deploy key 带写权限，**M0 前由 owner 移除或降权**；不得用它代替个人身份推送。
+- **身份模型（临时例外，2026-10-24 起）**：`ttss4096` 的 GitHub 账号暂不可用，当前以**仓库级 deploy key（有写权限）**推送。这是临时状态，不是目标形态。
+  - 现在能做：拉取、推分支。
+  - 现在不能做：作为 PR 作者 / approve、使用 CODEOWNERS、在网页端操作 Issue/PR。
+  - 工作流：改动推到 `feat/*` 分支 → 由 owner（`limpidus-xiaoche`）在网页端发起/合并 PR；**不直推 main**（hook 仍生效）。
+  - 退出条件：账号恢复或新建账号 → owner 加 collaborator + 用户级 SSH key → 本 deploy key 降为**只读（CI 专用）** → 恢复正常 PR 流程。
+  - 安全：私钥只留本机、不转给他人；一旦怀疑泄露，立即让 owner 删除该 deploy key。
+- **Deploy key 的目标形态**：仅 CI 只读。当前写权限是临时例外，迁移完成即降权。
 - **分支策略（务实版）**：Free 计划无法启用 rulesets / 强制 review，所以**不存在"已生效的 main 保护"**。执行方式：团队约定 + `.githooks/pre-push`（拒绝直接推 main）+ CI 检测直推并报警；force push 仅作约定禁止。
 - **Hook 安装（必需步骤）**：仓库内提交 `.githooks/pre-push`；每人执行 `git config core.hooksPath .githooks`。hooks 不随 clone 自动生效，M0 验收必须检查。
 - `CODEOWNERS` 仅作 review 路由（Free 计划不强制）。
@@ -903,7 +908,7 @@ docs: 契约 v0.5
 | 19 | 避免重复造轮子 | M1 前评估 **CmlLib.Core（MIT）** 覆盖元数据/下载/启动原语；接口不变 | 不引入 PCL 代码；评估结论在 M1 前落文档 |
 | 20 | 是否 fork XMCL | **否决**（保持路线 C） | XMCL 为 MIT、Electron/TypeScript，功能完整；但与 .NET/Avalonia 栈不兼容，切换需整体转 Node。仅作 UX 参考，不复制代码 |
 | 21 | CmlLib 复用边界 | 只复用无状态工具；下载/安装/启动/Java/账户/实例自研；M0 出结论 | 未出结论默认自研；**禁止双路径并存** |
-| 22 | 协作身份 | 开发者用 collaborators + 用户级 SSH；deploy key 仅 CI 只读 | Free 计划无强制保护，靠 hook + CI |
+| 22 | 协作身份 | **临时：deploy key 写权限**（账号暂不可用）；目标：collaborators + 用户级 SSH，deploy key 仅 CI 只读 | 分支推送 + owner 合并；账号恢复后迁移 |
 | 23 | 发布形态 | self-contained + R2R + 非单文件/非裁剪 | Velopack delta 对目录型产物最稳 |
 
 ---
