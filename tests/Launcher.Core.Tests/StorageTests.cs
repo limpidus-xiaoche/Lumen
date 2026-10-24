@@ -27,7 +27,7 @@ public sealed class StorageTests
     }
 
     [Fact]
-    public async Task Sqlite_Schema_Is_Version3()
+    public async Task Sqlite_Schema_Is_Version4()
     {
         var root = Path.Combine(Path.GetTempPath(), "lumen-tests", Guid.NewGuid().ToString("N"));
         var paths = new LauncherPaths(Path.Combine(root, "config"), Path.Combine(root, "local"));
@@ -36,7 +36,7 @@ public sealed class StorageTests
         var store = new SqliteStore(paths);
         await store.InitializeAsync();
 
-        Assert.Equal(3, await store.GetSchemaVersionAsync());
+        Assert.Equal(4, await store.GetSchemaVersionAsync());
         Assert.Empty(await store.GetInstancesAsync());
 
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

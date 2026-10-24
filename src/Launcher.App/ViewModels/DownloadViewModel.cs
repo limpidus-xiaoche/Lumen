@@ -129,6 +129,10 @@ public partial class DownloadViewModel : ObservableObject
     [ObservableProperty]
     private double installPercent;
 
+    /// <summary>总量未知（Percent = -1）时进度条走不确定态。</summary>
+    [ObservableProperty]
+    private bool isInstallIndeterminate;
+
     /// <summary>当前安装阶段文字，如「依赖库 · 32/78」。</summary>
     [ObservableProperty]
     private string installStageText = string.Empty;
@@ -410,6 +414,7 @@ public partial class DownloadViewModel : ObservableObject
 
         IsInstalling = true;
         InstallPercent = 0;
+        IsInstallIndeterminate = false;
         InstallStageText = string.Empty;
         var versionId = SelectedVersion.Id;
         var displayName = InstanceName.Trim();
@@ -419,6 +424,7 @@ public partial class DownloadViewModel : ObservableObject
         {
             var progress = new Progress<InstallProgress>(p => Dispatcher.UIThread.Post(() =>
             {
+                IsInstallIndeterminate = p.Percent < 0;
                 InstallPercent = p.Percent < 0 ? 0 : p.Percent;
                 InstallStageText = $"{StageLabel(p.Stage)} · {p.Message}";
                 StatusText = $"正在安装 {versionId}：{InstallStageText}";
@@ -437,6 +443,7 @@ public partial class DownloadViewModel : ObservableObject
                 CancellationToken.None);
 
             InstallPercent = 100;
+            IsInstallIndeterminate = false;
             InstallStageText = "安装完成";
             StatusText = $"已安装 {summary.Name}（{summary.VersionId}），可在启动页启动";
             await LoadInstancesAsync();
@@ -522,11 +529,13 @@ public partial class DownloadViewModel : ObservableObject
 
         IsInstalling = true;
         InstallPercent = 0;
+        IsInstallIndeterminate = false;
         InstallStageText = string.Empty;
         try
         {
             var progress = new Progress<InstallProgress>(p => Dispatcher.UIThread.Post(() =>
             {
+                IsInstallIndeterminate = p.Percent < 0;
                 InstallPercent = p.Percent < 0 ? 0 : p.Percent;
                 InstallStageText = $"{StageLabel(p.Stage)} · {p.Message}";
                 LoaderStatusText = $"正在安装 {displayName}：{InstallStageText}";
@@ -545,6 +554,7 @@ public partial class DownloadViewModel : ObservableObject
                 CancellationToken.None);
 
             InstallPercent = 100;
+            IsInstallIndeterminate = false;
             InstallStageText = "安装完成";
             LoaderStatusText = $"已安装 {summary.Name}（{loaderName} {loaderVersion}），可在启动页启动";
             await LoadInstancesAsync();

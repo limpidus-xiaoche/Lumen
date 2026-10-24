@@ -34,7 +34,7 @@
 - [x] **M2（A）完成**：下载引擎（分片/续传/SHA1/URL 安全）、Vanilla 安装、install journal、秒装、修复、CLI install/repair
 - [x] **M3（A）完成**：参数拼装/变量展开、Java 选择、argfile 编码与生命周期、进程启动/日志、退出归因、运行会话、CLI launch/stop/sessions
 - [x] **M2/M3 前端接线（B）**：下载页「原版游戏」版本筛选/搜索 + 安装进度条；加载器版本号列表（Fabric / Quilt / Forge / NeoForge）+ Fabric / Quilt 一键安装；Home 账号区移至启动按钮上方
-- [ ] **M2（B）任务中心**：取消 / 重试 / 启动恢复（未做；Core 已提供 `TaskRegistry` 与接口）
+- [x] **M2（B）任务中心**：左侧底部「任务」入口；任务列表（安装 / 修复 / 整合包）、状态胶囊、进度条（`Percent=-1` 走不确定态）、取消 / 重试 / 修复按钮；Core 任务落库并在启动时恢复，中断任务标记为可修复
 - [ ] **M3（B）运行体验**：实例卡片、实时日志面板、历史日志（未做）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
@@ -146,7 +146,7 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | 构建 | 0 警告 / 0 错误 |
 | 安全 | URL 校验：仅 https、host 白名单、私网/环回拒绝、重定向逐跳复检；单测覆盖 |
 
-> B 部分（任务中心 UI、进度展示、取消/重试按钮、启动恢复）尚未做；Core 已提供 `TaskRegistry` 与 `CancelTaskAsync/RetryTaskAsync`。
+> B 部分任务中心已完成（见下一节）；Core 提供 `TaskRegistry`，本轮补上了 SQLite 任务落库与重启恢复。
 > 断点续传逻辑已实现（`.part` + `.part.meta` + 分片文件），但本轮未做"中途强杀后续传"的实测。
 
 ## M3 验收结果（A 部分，2026-10-24）
@@ -176,6 +176,22 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | 已知 | Forge / NeoForge 仅列出版本号，一键安装需官方 installer + Java 执行，尚未接入；NeoForge 官方 maven 在本机不可达，元数据改走 BMCLAPI 镜像 |
 
 > 安装链路：`LoaderMetaClient` → `VersionResolver` 合并原版 + 加载器 profile → `VanillaInstaller` 下载库 → 实例写入 `Loader/LoaderVersion` → `LaunchService` 按加载器解析启动。
+
+## M2 任务中心验收结果（B 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| 任务入口 | 左侧底部「任务」按钮（PCL2 风格大按钮，与「更多」并列），进入即刷新并每秒轮询进行中任务 |
+| 任务列表 | 类型 / 实例名 / 状态胶囊 / 进度条 / 百分比 / 尝试次数 / 最近消息；进行中排在最前 |
+| `Percent = -1` | 进度条 `IsIndeterminate`，文案「准备中…」；下载页安装进度条同样支持不确定态 |
+| 取消 / 重试 | 进行中可取消；失败 / 取消可重试（`Attempts + 1`）；中断恢复的任务不提供重试，只提供「修复」 |
+| 启动恢复 | Core `TaskRegistry` 新增 SQLite `tasks` 表（schema v4）；重启后 `Running/Queued/Paused` 标记为失败（`E3004`），实例类任务可直接修复 |
+| 测试 | Core **47 项**、App **9 项**通过（新增任务中心 5 项、TaskRegistry 落库/恢复 2 项） |
+| 构建 | App 0 错误（3 条既有 `Watermark` 过时警告） |
+| 实测 | 真实 Core 模式任务中心空态正常；Fake 模式取消后任务转「已取消」并可重试 |
+| 顺带修复 | 下载页右侧分类栏只显示 `ModCategory { … }` 原始记录：`ListBoxItem` 模板的 `ContentPresenter` 未转发 `ContentTemplate`，补上后恢复中文分类名 |
+
+> 任务中心的 VM 只调用 `ILauncherFacade`，不做文件 IO；恢复语义由 Core 负责。
 
 ## 目标样本
 
@@ -336,4 +352,11 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              加载器区块：选加载器与游戏版本即列出完整版本号（稳定 / 历史标识），Fabric / Quilt 可一键安装；
              Home 账号区（离线 / 正版 pill + 64px 头像 + 用户名）移至启动大按钮上方，移除右上角账号卡片；
              CLI 新增 `loader-versions`、`install --loader/--loader-version`；实测 Fabric 0.16.10 + 1.21.1 安装成功（78 库）。
+
+[2026-10-24] M2 任务中心（B）：
+             左侧底部新增「任务」入口；任务中心页展示类型 / 实例 / 状态 / 进度 / 尝试次数与消息，
+             进行中任务每秒轮询，支持取消、重试与实例类任务修复；`Percent=-1` 统一走不确定进度条（任务中心 + 下载页）；
+             Core `TaskRegistry` 接入 SQLite `tasks` 表（schema v4），重启后未完成任务标记为 `E3004`（可修复），
+             历史任务保留最近 50 条；`TaskInfo` 契约新增 `TaskErrorCodes.Interrupted`；
+             顺带修复下载页分类栏 `ContentPresenter` 未转发 `ContentTemplate` 导致显示原始记录的问题。
 ```

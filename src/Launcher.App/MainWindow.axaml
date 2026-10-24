@@ -167,8 +167,26 @@
             </ListBox.ItemTemplate>
           </ListBox>
 
-          <!-- 底部：更多入口 + 版本信息 -->
+          <!-- 底部：任务中心 / 更多入口 + 版本信息 -->
           <StackPanel DockPanel.Dock="Bottom" Margin="10,0,10,16" Spacing="4">
+            <Button Content="任务"
+                    Command="{Binding ShowTasksCommand}"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Padding="22,16"
+                    Margin="4,8"
+                    MinHeight="52"
+                    CornerRadius="12"
+                    FontSize="17"
+                    Background="Transparent"
+                    Foreground="{DynamicResource TextSecondary}">
+              <Button.Styles>
+                <Style Selector="Button:pointerover">
+                  <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+                </Style>
+              </Button.Styles>
+            </Button>
+
             <Button Content="更多"
                     Command="{Binding ShowMoreCommand}"
                     HorizontalAlignment="Stretch"
@@ -187,7 +205,7 @@
               </Button.Styles>
             </Button>
 
-            <TextBlock Text="Lumen 0.1 · M0"
+            <TextBlock Text="Lumen 0.1 · M2"
                        Margin="26,0,0,0"
                        FontSize="11"
                        Opacity="0.45"

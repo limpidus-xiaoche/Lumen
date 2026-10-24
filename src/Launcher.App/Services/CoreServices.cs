@@ -61,7 +61,7 @@ public sealed class CoreServices
             manifest,
             javaLocator,
             installer,
-            new TaskRegistry(),
+            new TaskRegistry(sqlite),
             launcher,
             loaderMeta);
 

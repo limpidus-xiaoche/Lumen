@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Launcher.App.Views.TaskCenterView">
+  <UserControl.Styles>
+    <!-- 状态胶囊：进行中青色，失败红字，其余中性 -->
+    <Style Selector="Border.task-state">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.task-state TextBlock">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+    </Style>
+    <Style Selector="Border.task-state.active">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    </Style>
+    <Style Selector="Border.task-state.active TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+    <Style Selector="Border.task-state.failed TextBlock">
+      <Setter Property="Foreground" Value="#FF7B72" />
+    </Style>
+
+    <Style Selector="Button.task-btn">
+      <Setter Property="Padding" Value="12,5" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+    </Style>
+    <Style Selector="Button.task-btn:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid Margin="28,20,28,20" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+
+    <!-- 标题栏：标题 + 刷新 -->
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <TextBlock Text="任务中心" FontSize="24" FontWeight="Bold"
+                 Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="刷新" Command="{Binding RefreshCommand}"
+              IsEnabled="{Binding !IsBusy}"
+              Padding="14,7" CornerRadius="8" FontSize="12" />
+    </Grid>
+
+    <TextBlock Grid.Row="1" Text="{Binding StatusText}" FontSize="11" TextWrapping="Wrap"
+               Foreground="{DynamicResource TextMuted}" />
+
+    <ScrollViewer Grid.Row="2">
+      <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Left">
+
+        <TextBlock Text="暂无任务" IsVisible="{Binding IsEmpty}"
+                   FontSize="13" Foreground="{DynamicResource TextMuted}" Margin="0,16,0,0" />
+
+        <ItemsControl ItemsSource="{Binding Tasks}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Background="{DynamicResource CardBackground}" CornerRadius="10"
+                      BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                      Padding="14,12" Margin="0,0,0,10">
+                <StackPanel Spacing="8">
+
+                  <!-- 第一行：类型 + 实例名 + 状态 + 操作按钮 -->
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding KindText}" FontSize="13" FontWeight="SemiBold"
+                                 Foreground="{DynamicResource TextPrimary}" />
+                      <TextBlock Text="{Binding InstanceText}" FontSize="12"
+                                 Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" />
+                      <Border Classes="task-state"
+                              Classes.active="{Binding IsActive}"
+                              Classes.failed="{Binding IsFailed}">
+                        <TextBlock Text="{Binding StateText}" />
+                      </Border>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                      <Button Content="取消" Classes="task-btn"
+                              Command="{Binding CancelCommand}"
+                              IsVisible="{Binding CanCancel}"
+                              IsEnabled="{Binding !IsBusy}"
+                              Foreground="#FF7B72" />
+                      <Button Content="重试" Classes="task-btn"
+                              Command="{Binding RetryCommand}"
+                              IsVisible="{Binding CanRetry}"
+                              IsEnabled="{Binding !IsBusy}" />
+                      <Button Content="修复" Classes="task-btn"
+                              Command="{Binding RepairCommand}"
+                              IsVisible="{Binding CanRepair}"
+                              IsEnabled="{Binding !IsBusy}"
+                              Background="{DynamicResource AccentSoft}"
+                              Foreground="{DynamicResource AccentGlow}" />
+                    </StackPanel>
+                  </Grid>
+
+                  <!-- 第二行：进度条 + 百分比 + 尝试次数 -->
+                  <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                    <ProgressBar Grid.Column="0" Height="4"
+                                 Minimum="0" Maximum="100"
+                                 Value="{Binding ProgressValue}"
+                                 IsIndeterminate="{Binding IsIndeterminate}"
+                                 VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding PercentText}" FontSize="11"
+                               Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding AttemptsText}"
+                               IsVisible="{Binding ShowAttempts}"
+                               FontSize="10" Foreground="{DynamicResource TextMuted}"
+                               VerticalAlignment="Center" />
+                  </Grid>
+
+                  <!-- 第三行：最近一条进度/错误信息 -->
+                  <TextBlock Text="{Binding Message}" FontSize="11" TextWrapping="Wrap"
+                             Foreground="{DynamicResource TextMuted}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>
