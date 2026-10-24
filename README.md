@@ -125,5 +125,5 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 [2026-10-24] 仓库已接通（写权限验证通过）：
              本地已 git init（main），首个提交 c2d2f65（README/technoledge/.gitignore/.gitattributes）；
              远程 origin = git@github.com:limpidus-xiaoche/Lumen.git，main 已推送并跟踪；
-             `_probe/` 已加入 .gitignore，不提交；提交身份使用仓库级 noreply 地址。
+             `_probe/` 已加入 .gitignore，不提交；提交身份为仓库级 ttss4096 <ttss4096@outlook.com>（未改全局）。
 ```
