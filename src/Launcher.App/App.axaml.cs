@@ -1,6 +1,9 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Launcher.App.Mock;
 using Launcher.App.Services;
 using Launcher.App.ViewModels;
@@ -20,15 +23,19 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var useFake = desktop.Args?.Contains("--fake", StringComparer.OrdinalIgnoreCase) == true;
             ILauncherFacade facade;
             try
             {
-                facade = CoreServices.Create().Facade;
+                facade = useFake ? new FakeLauncherFacade() : CoreServices.Create().Facade;
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "初始化 Core 失败，回退到 FakeLauncherFacade");
-                facade = new FakeLauncherFacade();
+                // 不允许静默回退 Fake：启动失败必须让用户看见，并能导出诊断。
+                Log.Error(ex, "初始化 Core 失败，终止启动（可用 --fake 进入演示模式）");
+                desktop.MainWindow = BuildStartupErrorWindow(ex);
+                base.OnFrameworkInitializationCompleted();
+                return;
             }
 
             desktop.MainWindow = new MainWindow
@@ -38,5 +45,47 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static Window BuildStartupErrorWindow(Exception ex)
+    {
+        var panel = new StackPanel
+        {
+            Margin = new Thickness(28),
+            Spacing = 14,
+        };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Lumen 启动失败",
+            FontSize = 22,
+            FontWeight = FontWeight.Bold,
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = ex.Message,
+            TextWrapping = TextWrapping.Wrap,
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "可执行 `lumen diagnostics` 导出诊断包；详细日志见 %LOCALAPPDATA%\\Lumen\\logs。",
+            Opacity = 0.75,
+            TextWrapping = TextWrapping.Wrap,
+        });
+        panel.Children.Add(new Button
+        {
+            Content = "关闭",
+            HorizontalAlignment = HorizontalAlignment.Right,
+        });
+
+        var window = new Window
+        {
+            Title = "Lumen 启动失败",
+            Width = 640,
+            Height = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Content = panel,
+        };
+        ((Button)panel.Children[3]).Click += (_, _) => window.Close();
+        return window;
     }
 }

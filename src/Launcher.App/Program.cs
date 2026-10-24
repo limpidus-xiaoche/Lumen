@@ -56,6 +56,22 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .With(new Win32PlatformOptions
+            {
+                // 世界层依赖 OpenGlControlBase 的 GL 互操作：优先 ANGLE/EGL，其次 WGL，最后软件渲染（会自动降级）。
+                RenderingMode =
+                [
+                    Win32RenderingMode.AngleEgl,
+                    Win32RenderingMode.Wgl,
+                    Win32RenderingMode.Software,
+                ],
+                CompositionMode =
+                [
+                    Win32CompositionMode.WinUIComposition,
+                    Win32CompositionMode.RedirectionSurface,
+                ],
+                DpiAwareness = Win32DpiAwareness.PerMonitorDpiAware,
+            })
             .WithInterFont()
             .LogToTrace();
 }

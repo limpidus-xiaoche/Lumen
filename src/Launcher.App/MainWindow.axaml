@@ -1,24 +1,12 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="using:Launcher.App.Shell"
         x:Class="Launcher.App.MainWindow"
         Title="Lumen"
-        Width="960"
-        Height="640"
         WindowStartupLocation="CenterScreen"
-        Background="#12141A">
-  <Grid ColumnDefinitions="220,*">
-    <Border Grid.Column="0" Background="#1B1E26">
-      <StackPanel Margin="16" Spacing="12">
-        <TextBlock Text="Lumen" FontSize="24" FontWeight="Bold" Foreground="#4A9EFF" Margin="8,8,0,12" />
-        <ListBox ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage}" Background="Transparent">
-          <ListBox.ItemTemplate>
-            <DataTemplate>
-              <TextBlock Text="{Binding Title}" Padding="8,6" />
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-      </StackPanel>
-    </Border>
-    <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" Margin="8" />
-  </Grid>
+        WindowState="FullScreen"
+        WindowDecorations="None"
+        CanResize="False"
+        Background="#05030A">
+  <shell:ImmersiveShell />
 </Window>
