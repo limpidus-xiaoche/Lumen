@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using Launcher.Core.Auth;
+using Launcher.Core.Java;
+using Launcher.Core.Meta;
 using Launcher.Core.Storage;
 using Launcher.Protocol;
 using Microsoft.Extensions.Logging;
@@ -12,37 +14,49 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly AppSettingsStore _settingsStore;
     private readonly SqliteStore _sqlite;
     private readonly ILogger<LauncherFacade> _logger;
+    private readonly ManifestClient? _manifestClient;
+    private readonly JavaLocator? _javaLocator;
 
     public LauncherFacade(
         LauncherPaths paths,
         AppSettingsStore settingsStore,
         SqliteStore sqlite,
-        ILogger<LauncherFacade> logger)
+        ILogger<LauncherFacade> logger,
+        ManifestClient? manifestClient = null,
+        JavaLocator? javaLocator = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
         _sqlite = sqlite;
         _logger = logger;
+        _manifestClient = manifestClient;
+        _javaLocator = javaLocator;
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
     {
         var settings = _settingsStore.Load();
         var instances = await _sqlite.GetInstancesAsync(ct);
+        var javas = _javaLocator?.Detect() ?? Array.Empty<JavaRuntime>();
         return new LauncherSnapshot(
             settings,
             instances,
             Array.Empty<AccountSummary>(),
             ActiveAccountId: null,
-            Array.Empty<JavaRuntime>(),
+            javas,
             ManifestUpdatedAt: null,
             AppVersion: typeof(LauncherFacade).Assembly.GetName().Version?.ToString() ?? "0.0.0");
     }
 
-    public Task<VersionManifest> RefreshManifestAsync(ManifestRefreshMode mode, CancellationToken ct)
+    public async Task<VersionManifest> RefreshManifestAsync(ManifestRefreshMode mode, CancellationToken ct)
     {
-        _logger.LogInformation("manifest 刷新尚未实现（M0）：mode={Mode}", mode);
-        return Task.FromResult(new VersionManifest("1.21.1", Array.Empty<VersionSummary>()));
+        if (_manifestClient is not null)
+        {
+            return await _manifestClient.GetManifestAsync(mode == ManifestRefreshMode.Force, ct);
+        }
+
+        _logger.LogInformation("manifest 客户端未注入（M0 配置）：mode={Mode}", mode);
+        return new VersionManifest(new LatestVersions("1.21.1", null), Array.Empty<VersionSummary>());
     }
 
     public Task<IReadOnlyList<LoaderVersionInfo>> GetLoaderVersionsAsync(

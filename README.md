@@ -110,6 +110,18 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | 架构测试 | Core 不依赖 Avalonia / Hosting / DI |
 | pre-push hook | 文件已提交，待执行 `git config core.hooksPath .githooks` 启用 |
 
+## M1 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| `versions --limit 5` | `latest_release=26.3` / `latest_snapshot=26.4-snapshot-5`，清单解析正确 |
+| `resolve 1.21.1` | mainClass `net.minecraft.client.main.Main`；97 个库；28 game args；11 jvm args；assetIndex 17 |
+| `java` | 检出 6 个 JDK（Oracle 25/21、Temurin 21/17、Microsoft 21，全部 x64） |
+| 测试 | **26 项通过**（Core 23 / App 2 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+
+> B 部分（下载页版本列表、设置页 Java 列表）尚未做；按最新约定，由 A 提供最小基础模型、B 负责优化定稿。
+
 ## 目标样本
 
 | 启动器 | 路径 | 大小 | 版本 |

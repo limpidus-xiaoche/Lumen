@@ -28,7 +28,7 @@ public sealed class FakeLauncherFacade : ILauncherFacade
             "0.1.0-m0"));
 
     public Task<VersionManifest> RefreshManifestAsync(ManifestRefreshMode mode, CancellationToken ct) =>
-        Task.FromResult(new VersionManifest("1.21.1",
+        Task.FromResult(new VersionManifest(new LatestVersions("1.21.1", "26.4-snapshot-5"),
         [
             new VersionSummary("1.21.1", "release", "https://example.invalid/1.21.1.json", null),
             new VersionSummary("1.20.1", "release", "https://example.invalid/1.20.1.json", null),
