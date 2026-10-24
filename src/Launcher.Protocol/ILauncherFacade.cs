@@ -42,6 +42,15 @@ public interface ILauncherFacade
     // 模组
     Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct);
     Task SetModEnabledAsync(string instanceId, string modId, bool enabled, CancellationToken ct);
+    Task DeleteModAsync(string instanceId, string modId, CancellationToken ct);
+    Task ImportModAsync(string instanceId, string sourceJarPath, CancellationToken ct);
+
+    // 在线模组（Modrinth）
+    Task<IReadOnlyList<OnlineModSummary>> SearchOnlineModsAsync(
+        ModSource source, string query, string? modCategory, LoaderKind? loader, string? gameVersion, int page, CancellationToken ct);
+    Task<string> InstallOnlineModAsync(
+        string instanceId, ModSource source, string projectId, string? gameVersion, LoaderKind loader,
+        IProgress<InstallProgress> progress, CancellationToken ct);
 
     // 实例运维
     Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct);

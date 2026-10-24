@@ -27,6 +27,15 @@
 - [x] `technoledge.md` 升版 **v0.5**：P0/P1 全部回写（CmlLib 边界、协作身份、许可存证、编码/源/任务/SSRF/lzma、DTO、孤儿进程、hook、发布形态、路径/GC）
 - [ ] **临时**：使用仓库 deploy key 推送（`ttss4096` 账号暂不可用）；账号恢复后迁移到 collaborators + 用户级 SSH，deploy key 降为只读
 - [x] **M0 完成**：解决方案 + Protocol/Core/App/CLI + SQLite v3 + 离线身份 + 六页 Avalonia 壳 + FakeLauncherFacade + 8 项测试 + pre-push hook 文件
+  - **归属说明**：`src/Launcher.App/**` 与 `tests/Launcher.App.Tests/**` 由 **A 代搭最小脚手架**（六页 + Fake + 深色主题），由 **B 接管**；B 首次提交后 App 路径只由 B 修改。
+- [ ] B 接管 App：在 `feat/ui-m0` 分支确认或重写脚手架，并在提交信息中说明
+- [x] **M1（A）完成**：manifest（含 `latest` 解析）、version.json、rules、`inheritsFrom` 合并、Java 探测（32/64 注册表）
+- [x] **M1（B）基础模型**：下载页接真实 manifest 列表、设置页接真实 Java 列表；B 负责优化定稿
+- [x] **M2（A）完成**：下载引擎（分片/续传/SHA1/URL 安全）、Vanilla 安装、install journal、秒装、修复、CLI install/repair
+- [x] **M3（A）完成**：参数拼装/变量展开、Java 选择、argfile 编码与生命周期、进程启动/日志、退出归因、运行会话、CLI launch/stop/sessions
+- [x] **M2/M3 前端接线（B）**：下载页「原版游戏」版本筛选/搜索 + 安装进度条；加载器版本号列表（Fabric / Quilt / Forge / NeoForge）+ Fabric / Quilt 一键安装；Home 账号区移至启动按钮上方
+- [ ] **M2（B）任务中心**：取消 / 重试 / 启动恢复（未做；Core 已提供 `TaskRegistry` 与接口）
+- [ ] **M3（B）运行体验**：实例卡片、实时日志面板、历史日志（未做）
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -109,6 +118,64 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | GUI 冒烟 | `Lumen.exe` 启动并保持运行；日志写入 `%LOCALAPPDATA%\Lumen\logs` |
 | 架构测试 | Core 不依赖 Avalonia / Hosting / DI |
 | pre-push hook | 文件已提交，待执行 `git config core.hooksPath .githooks` 启用 |
+| App 归属 | A 代搭脚手架；B 接管；后续基础模型由 A 提供、B 优化 |
+
+## M1 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| `versions --limit 5` | `latest_release=26.3` / `latest_snapshot=26.4-snapshot-5`，清单解析正确 |
+| `resolve 1.21.1` | mainClass `net.minecraft.client.main.Main`；97 个库；28 game args；11 jvm args；assetIndex 17 |
+| `java` | 检出 6 个 JDK（Oracle 25/21、Temurin 21/17、Microsoft 21，全部 x64） |
+| 测试 | **28 项通过**（Core 23 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+| 前端基础模型 | 下载页接 `RefreshManifestAsync`（真实版本列表）；设置页接 `GetSnapshotAsync`（Java 列表）；App 启动使用真实 `LauncherFacade` |
+| GUI 冒烟（真实 Core） | `Lumen.exe` 启动，SQLite 初始化成功，日志无错误 |
+
+> B 部分只做了基础模型（数据绑定 + 列表），视觉与交互仍由 B 优化定稿。
+
+## M2 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| `install 1.21.1`（完整资源） | 成功；70 个库；**787.6 MB** 资源；客户端 jar SHA1 与 manifest 一致 |
+| `install 1.12.2`（完整资源） | 成功；1290 个 asset、105 个库文件、11 个 native；客户端 SHA1 一致 |
+| 秒装 | 重复安装 1.12.2（含资源）**1.61s**；1.21.1（跳过资源）**1.14s** |
+| 修复 | 删除 `patchy-1.3.9.jar` 后 `repair test-1.12.2`，**3.78s** 恢复 |
+| 测试 | **35 项通过**（Core 30 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+| 安全 | URL 校验：仅 https、host 白名单、私网/环回拒绝、重定向逐跳复检；单测覆盖 |
+
+> B 部分（任务中心 UI、进度展示、取消/重试按钮、启动恢复）尚未做；Core 已提供 `TaskRegistry` 与 `CancelTaskAsync/RetryTaskAsync`。
+> 断点续传逻辑已实现（`.part` + `.part.meta` + 分片文件），但本轮未做"中途强杀后续传"的实测。
+
+## M3 验收结果（A 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| 真实启动 | `launch test-1.21.1 --username Player` 成功；游戏进入主菜单（日志出现 atlas 创建） |
+| 运行会话 | `sessions` 显示 `pid=83128`；`stop` 后输出"没有运行中的游戏" |
+| 停止 | `stop` 使用 Graceful，游戏打印 `Stopping!`，退出码 **0** |
+| 日志 | stdout/stderr 实时回传；退出归因已接（崩溃报告/退出码） |
+| 测试 | **50 项通过**（Core 45 / App 4 / Integration 1） |
+| 构建 | 0 警告 / 0 错误 |
+| 默认语言 | 安装/首次启动前写入 `options.txt` `lang:zh_cn`；实机启动并退出后仍为 `zh_cn` |
+| 已知 | 1.21.1 命令行未超 24K，真实 argfile 启动未覆盖；Java 8 超长命令行未实现 wrapper（报 `E5003`） |
+
+> 离线账号的 Realms 认证会报 `Failed to parse into SignedJWT`，属于预期（没有正版 token），不影响本地游戏。
+
+## M2/M3 前端接线验收结果（B 部分，2026-10-24）
+
+| 项 | 结果 |
+|---|---|
+| `loader-versions 1.21.1` | Fabric 255+ 个（首项 `0.20.1` 稳定）、Quilt 有列表、Forge **69 个**（如 `52.1.20`）、NeoForge **259 个**（如 `21.1.209`），版本号完整显示 |
+| `install 1.21.1 --loader fabric --loader-version 0.16.10` | 成功；**78 个库**（原版 70 + Fabric profile 8：loader/intermediary/sponge-mixin/asm×5）；实例状态 `Ready` |
+| `install 1.21.1`（原版，跳过资源） | 成功；秒装复用本地文件，最终 `Done` |
+| 构建 | App / Core / CLI 全部 0 错误 |
+| 测试 | Core 45 项、App 4 项通过 |
+| 已知 | Forge / NeoForge 仅列出版本号，一键安装需官方 installer + Java 执行，尚未接入；NeoForge 官方 maven 在本机不可达，元数据改走 BMCLAPI 镜像 |
+
+> 安装链路：`LoaderMetaClient` → `VersionResolver` 合并原版 + 加载器 profile → `VanillaInstaller` 下载库 → 实例写入 `Loader/LoaderVersion` → `LaunchService` 按加载器解析启动。
 
 ## 目标样本
 
@@ -198,4 +265,75 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              设置页新增深色模式切换（M0 占位，直接生效）；FakeLauncherFacade 进度对齐契约
              （200ms/次，前两阶段 Percent=-1 不确定态）；build 0 警告 0 错误，App.Tests 2 项通过；
              hook 生效验证：直推 main 被本地拒绝；待 owner 网页端合并 feat/ui-m0。
+
+[2026-10-24] B（UI）window-chrome 定稿：
+             无边框窗口 920×560（自定义标题栏：麦谷Limpidus 亮青标识 + 最小化/关闭）；
+             账号区改为右上角竖排卡片（模式 pill 放大 15px + 80px 头像 + 用户名）；底部版本号 Lumen 0.1 · M0。
+
+[2026-10-24] M0 App 归属确认：
+             A 代搭 `src/Launcher.App` 与 `tests/Launcher.App.Tests` 的最小脚手架（六页 + Fake + 深色主题）；
+             B 接管，可整体重写；自 B 首次提交起，App 路径只由 B 修改，A 不再改动。
+
+[2026-10-24] 前端策略更新：App 归属仍为 B；后续由 A 提供**最小基础模型**（页面骨架/绑定/数据接口），
+             B 负责优化与设计定稿；A 只在 B 明确请求时修改 App。
+
+[2026-10-24] M1（A）完成：
+             ManifestClient（官方 + BMCLAPI fallback + 15 分钟缓存，正确解析 latest.release/snapshot）；
+             VersionResolver（inheritsFrom 递归合并、库按 group:artifact 去重、参数拼接）；
+             RuleEvaluator（os.name/arch/version/features）；JavaLocator（JAVA_HOME/注册表 32+64/常见目录/PATH/内置 runtime）；
+             JavaVersionParser（release 优先、属性回退）；CLI 增加 versions / java / resolve；26 项测试通过。
+
+[2026-10-24] M1 前端基础模型：
+             App 改用真实 LauncherFacade（CoreServices 组装路径/设置/SQLite/manifest/Java）；
+             下载页加载 manifest 并列出真实版本；设置页加载并显示本机 Java；
+             新增 2 项 ViewModel 测试（总计 28 项）；视觉与交互待 B 优化。
+
+[2026-10-24] M2（A）完成：
+             DownloadEngine（16MB 阈值分片、8MB/片、Range 续传、顺序 SHA1、镜像回退、URL 安全校验、逐跳重定向）；
+             VanillaInstaller（client jar/libraries/natives/assets、legacy virtual、磁盘预检、install journal、状态机）；
+             TaskRegistry + ThrottledProgress（10Hz）；Facade install/repair/cancel/retry/getTasks；
+             CLI install/repair；35 项测试通过；1.21.1（787.6 MB 资源）与 1.12.2 完整安装、秒装、修复均实测通过。
+
+[2026-10-24] M3（A）完成：
+             ArgumentBuilder（legacy/现代参数、rules、变量展开、未解析 E5002、classpath）；
+             JavaVersionPolicy（版本约束 + 1.13+ 64 位过滤）；ArgFileWriter（ANSI/UTF-8、转义、首行后删除、清扫）；
+             LaunchService（进程启动、stdout/stderr、退出归因、RunningSessionStore 持久化）；CLI launch/stop/sessions；
+             48 项测试通过；1.21.1 真实启动、会话可见、Graceful 停止 exit 0 已实测。
+
+[2026-10-24] 默认游戏语言：
+             `GameOptions.EnsureDefaultLanguage` 在安装与启动前检查 `options.txt`，缺失时写入 `lang:zh_cn`；
+             已有文件不覆盖（尊重用户改动）；当前实例已修正并在实机启动/退出后验证仍为 zh_cn；测试增至 50 项。
+
+[2026-10-24] M1 合并（feat/m1-merge）：
+             合入 window-chrome（B 布局定稿）+ m3-core（A 全部核心 M1-M3）；
+             设计以 B 为准，数据接 A 真实门面：下载页真实版本清单、设置页真实 Java 检测；
+             Home 启动按钮 M1 暂不接真实启动（M2 安装 UI 未接），待 M3 阶段接线。
+
+[2026-10-24] B（UI）M1 页面落地：
+             版本设置页改为横向分类（概览 / 启动 / Mod 管理），「启动」栏新增 Java 环境选择，
+             下拉项显示版本（Java 17 / 21…）与完整文件路径，保存时写入 settings.JavaPath；
+             Mod 管理支持扫描 / 启用 / 禁用 / 删除 / 添加 jar：从 fabric.mod.json 提取 id、名称、版本，
+             并提取 jar 内 icon.png（或 logo.png / pack.png）作为图标，取不到时回退首字母方块；
+             左侧底部新增「更多」：关于、免责声明（Minecraft/加载器/模组版权归属）、功能对接状态、项目主页；
+             窗口保持无边框 820×560 紧凑布局，右上角竖排账号卡片（离线 / 正版 pill + 80px 头像）。
+
+[2026-10-24] 模组下载体验迭代：
+             模组名中英并显（内置 40+ 常用模组译名表，未收录则显示英文原名）；
+             右侧「分类」栏可收纳（性能优化 / 冒险 / 科技 / 魔法 / 装饰 / 工具 / 世界生成 / 存储 / 生物 / 装备 / 前置库），
+             对应 Modrinth facets 的 categories 过滤；结果改为固定高度独立滚动 + 上一页 / 下一页分页（每页 20 条），
+             避免长列表把分类栏顶出视野；账号卡片后续已迁移到启动页，不再占用下载页。
+             下载页分「原版游戏 / 模组」两栏；模组栏进入即按下载量加载热门列表，无需先搜索；
+             已接入 **Modrinth 开放 API**：搜索、按当前实例加载器与游戏版本挑选文件、图标缓存、安装到 mods；
+             已接入 **CurseForge 官方 API**：同一套 UI 可切换渠道，需设置环境变量 `LUMEN_CURSEFORGE_KEY` 后重启；
+             作者关闭第三方下载的 CF 文件会提示「请前往 CurseForge 页面手动下载」，不会静默失败。
+
+[2026-10-24] M2/M3 前端接线（B）：
+             下载页原版游戏：正式版 / 快照 / 全部筛选 + 版本号搜索 + 中文类型标识 + 安装进度条（阶段中文映射）；
+             新增 `LoaderMetaClient`：Fabric / Quilt 官方 meta、Forge maven 元数据 + promotions 推荐标记、
+             NeoForge（BMCLAPI 镜像；1.20.1 走 legacy net/neoforged/forge 路径）；
+             `VersionResolver` 支持「原版 + 加载器 profile」合并，`VanillaInstaller` / `LaunchService` 按实例 Loader/LoaderVersion 解析；
+             库下载支持 profile 的仓库根地址（`maven.fabricmc.net` / `maven.quiltmc.org` 已加入白名单）；
+             加载器区块：选加载器与游戏版本即列出完整版本号（稳定 / 历史标识），Fabric / Quilt 可一键安装；
+             Home 账号区（离线 / 正版 pill + 64px 头像 + 用户名）移至启动大按钮上方，移除右上角账号卡片；
+             CLI 新增 `loader-versions`、`install --loader/--loader-version`；实测 Fabric 0.16.10 + 1.21.1 安装成功（78 库）。
 ```

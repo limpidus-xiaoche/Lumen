@@ -28,7 +28,7 @@ public sealed class FakeLauncherFacade : ILauncherFacade
             "0.1.0-m0"));
 
     public Task<VersionManifest> RefreshManifestAsync(ManifestRefreshMode mode, CancellationToken ct) =>
-        Task.FromResult(new VersionManifest("1.21.1",
+        Task.FromResult(new VersionManifest(new LatestVersions("1.21.1", "26.4-snapshot-5"),
         [
             new VersionSummary("1.21.1", "release", "https://example.invalid/1.21.1.json", null),
             new VersionSummary("1.20.1", "release", "https://example.invalid/1.20.1.json", null),
@@ -132,15 +132,57 @@ public sealed class FakeLauncherFacade : ILauncherFacade
 
     public Task SetActiveAccountAsync(string accountId, CancellationToken ct) => Task.CompletedTask;
 
+    private static readonly List<ModEntry> FakeMods =
+    [
+        new ModEntry("sodium", "Sodium", "0.6.0", "sodium.jar", true, LoaderKind.Fabric, [], null),
+        new ModEntry("iris", "Iris", "1.8.0", "iris.jar", true, LoaderKind.Fabric, ["sodium"], null),
+    ];
+
     public Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<ModEntry>>(
+        Task.FromResult<IReadOnlyList<ModEntry>>(FakeMods.ToArray());
+
+    public Task SetModEnabledAsync(string instanceId, string modId, bool enabled, CancellationToken ct)
+    {
+        var index = FakeMods.FindIndex(m => m.Id == modId);
+        if (index >= 0)
+        {
+            FakeMods[index] = FakeMods[index] with { Enabled = enabled };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteModAsync(string instanceId, string modId, CancellationToken ct)
+    {
+        FakeMods.RemoveAll(m => m.Id == modId);
+        return Task.CompletedTask;
+    }
+
+    public Task ImportModAsync(string instanceId, string sourceJarPath, CancellationToken ct)
+    {
+        var name = Path.GetFileNameWithoutExtension(sourceJarPath);
+        FakeMods.Add(new ModEntry(
+            name, name, null, Path.GetFileName(sourceJarPath), true, LoaderKind.Fabric, [], null));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<OnlineModSummary>> SearchOnlineModsAsync(
+        ModSource source, string query, string? modCategory, LoaderKind? loader, string? gameVersion, int page, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<OnlineModSummary>>(
         [
-            new ModEntry("sodium", "Sodium", "0.6.0", "sodium.jar", true, LoaderKind.Fabric, [], null),
-            new ModEntry("iris", "Iris", "1.8.0", "iris.jar", true, LoaderKind.Fabric, ["sodium"], null),
+            new OnlineModSummary("sodium", "sodium", "Sodium", "现代渲染优化，大幅提升帧率", "jellysquid3", 42000000, null),
+            new OnlineModSummary("iris", "iris", "Iris Shaders", "高性能光影加载器，兼容主流光影包", "coderbot", 18000000, null),
         ]);
 
-    public Task SetModEnabledAsync(string instanceId, string modId, bool enabled, CancellationToken ct) =>
-        Task.CompletedTask;
+    public Task<string> InstallOnlineModAsync(
+        string instanceId, ModSource source, string projectId, string? gameVersion, LoaderKind loader,
+        IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        var fileName = projectId + ".jar";
+        FakeMods.Add(new ModEntry(
+            projectId, projectId, null, fileName, true, loader, [], null));
+        return Task.FromResult(fileName);
+    }
 
     public Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct) =>
         Task.CompletedTask;

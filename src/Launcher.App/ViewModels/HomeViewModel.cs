@@ -10,6 +10,8 @@ namespace Launcher.App.ViewModels;
 public partial class HomeViewModel : ObservableObject
 {
     private readonly ILauncherFacade _facade;
+    private readonly Action<object> _openSubPage;
+    private readonly Action _goHome;
 
     public ObservableCollection<InstanceSummary> Instances { get; } = [];
 
@@ -29,9 +31,11 @@ public partial class HomeViewModel : ObservableObject
         : $"{SelectedInstance.VersionId} · {LoaderLabel(SelectedInstance.Loader)}" +
           (SelectedInstance.LoaderVersion is null ? string.Empty : $" {SelectedInstance.LoaderVersion}");
 
-    public HomeViewModel(ILauncherFacade facade)
+    public HomeViewModel(ILauncherFacade facade, Action<object> openSubPage, Action goHome)
     {
         _facade = facade;
+        _openSubPage = openSubPage;
+        _goHome = goHome;
         _ = LoadAsync();
     }
 
@@ -74,6 +78,10 @@ public partial class HomeViewModel : ObservableObject
 
             await _facade.LaunchAsync(SelectedInstance.Id, progress, CancellationToken.None);
         }
+        catch (Exception ex)
+        {
+            StatusText = $"启动失败：{ex.Message}";
+        }
         finally
         {
             IsLaunching = false;
@@ -84,9 +92,22 @@ public partial class HomeViewModel : ObservableObject
     {
         StatusText = e.Kind switch
         {
-            LaunchEventKind.Started => "游戏进程已启动（Fake）",
+            LaunchEventKind.Started => "游戏进程已启动",
             LaunchEventKind.Exited => $"游戏已退出（代码 {e.ExitCode}）",
             _ => StatusText,
         };
+    }
+
+    /// <summary>打开当前实例的版本设置页。</summary>
+    [RelayCommand]
+    private void OpenVersionSettings()
+    {
+        if (SelectedInstance is null)
+        {
+            StatusText = "没有可设置的实例";
+            return;
+        }
+
+        _openSubPage(new VersionSettingsViewModel(_facade, SelectedInstance, _goHome));
     }
 }

@@ -17,6 +17,23 @@ public sealed record ModEntry(
     IReadOnlyList<string> Dependencies,
     string? IconPath);
 
+/// <summary>在线模组下载渠道。</summary>
+public enum ModSource
+{
+    Modrinth,
+    CurseForge,
+}
+
+/// <summary>在线模组搜索结果（Modrinth / CurseForge）。</summary>
+public sealed record OnlineModSummary(
+    string ProjectId,
+    string Slug,
+    string Title,
+    string Description,
+    string? Author,
+    long Downloads,
+    string? IconPath);
+
 public enum ModpackKind
 {
     Modrinth,

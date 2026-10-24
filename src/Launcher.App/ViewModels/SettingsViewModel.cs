@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,11 +13,16 @@ public partial class SettingsViewModel : ObservableObject
     private readonly LogsViewModel _logs;
     private readonly Action<object> _openSubPage;
 
+    public ObservableCollection<JavaRuntime> Javas { get; } = [];
+
     [ObservableProperty]
     private int maxMemoryMb = 4096;
 
     [ObservableProperty]
     private string statusText = "设置尚未保存";
+
+    [ObservableProperty]
+    private string javaStatusText = "尚未检测 Java";
 
     /// <summary>当前是否为深色主题（默认深色）。</summary>
     [ObservableProperty]
@@ -38,7 +44,28 @@ public partial class SettingsViewModel : ObservableObject
     private async Task SaveAsync()
     {
         await _facade.UpdateSettingsAsync(new AppSettingsPatch(MaxMemoryMb: MaxMemoryMb), CancellationToken.None);
-        StatusText = $"已保存：最大内存 {MaxMemoryMb} MB（Fake）";
+        StatusText = $"已保存：最大内存 {MaxMemoryMb} MB";
+    }
+
+    /// <summary>刷新并列出本机检测到的 Java 运行时（真实门面 JavaLocator）。</summary>
+    [RelayCommand]
+    private async Task LoadJavasAsync()
+    {
+        try
+        {
+            var snapshot = await _facade.GetSnapshotAsync(CancellationToken.None);
+            Javas.Clear();
+            foreach (var java in snapshot.Javas)
+            {
+                Javas.Add(java);
+            }
+
+            JavaStatusText = $"检测到 {Javas.Count} 个 Java";
+        }
+        catch (Exception ex)
+        {
+            JavaStatusText = $"检测失败：{ex.Message}";
+        }
     }
 
     /// <summary>次级入口：打开实例管理页。</summary>
