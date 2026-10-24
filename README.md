@@ -27,6 +27,8 @@
 - [x] `technoledge.md` 升版 **v0.5**：P0/P1 全部回写（CmlLib 边界、协作身份、许可存证、编码/源/任务/SSRF/lzma、DTO、孤儿进程、hook、发布形态、路径/GC）
 - [ ] **临时**：使用仓库 deploy key 推送（`ttss4096` 账号暂不可用）；账号恢复后迁移到 collaborators + 用户级 SSH，deploy key 降为只读
 - [x] **M0 完成**：解决方案 + Protocol/Core/App/CLI + SQLite v3 + 离线身份 + 六页 Avalonia 壳 + FakeLauncherFacade + 8 项测试 + pre-push hook 文件
+  - **归属说明**：`src/Launcher.App/**` 与 `tests/Launcher.App.Tests/**` 由 **A 代搭最小脚手架**（六页 + Fake + 深色主题），由 **B 接管**；B 首次提交后 App 路径只由 B 修改。
+- [ ] B 接管 App：在 `feat/ui-m0` 分支确认或重写脚手架，并在提交信息中说明
 
 ## v0.4 复审记录（已回写 v0.5，保留追溯）
 
@@ -109,6 +111,7 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 | GUI 冒烟 | `Lumen.exe` 启动并保持运行；日志写入 `%LOCALAPPDATA%\Lumen\logs` |
 | 架构测试 | Core 不依赖 Avalonia / Hosting / DI |
 | pre-push hook | 文件已提交，待执行 `git config core.hooksPath .githooks` 启用 |
+| App 归属 | A 代搭脚手架，B 接管；后续 App 改动只由 B 提交 |
 
 ## 目标样本
 
@@ -191,4 +194,8 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 [2026-10-24] 协作方式临时调整：`ttss4096` 账号暂不可用，继续使用仓库 deploy key 推送；
              工作流改为「推 feat/* 分支 → owner 在网页端合并」，不直推 main；
              账号恢复后再迁移到 collaborators + 用户级 SSH，deploy key 降为 CI 只读。
+
+[2026-10-24] M0 App 归属确认：
+             A 代搭 `src/Launcher.App` 与 `tests/Launcher.App.Tests` 的最小脚手架（六页 + Fake + 深色主题）；
+             B 接管，可整体重写；自 B 首次提交起，App 路径只由 B 修改，A 不再改动。
 ```
