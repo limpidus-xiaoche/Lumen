@@ -135,7 +135,7 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 
 | 项 | 结果 |
 |---|---|
-| `install 1.21.1 --skip-assets` | 成功；70 个库；客户端 jar SHA1 与 manifest 一致 |
+| `install 1.21.1`（完整资源） | 成功；70 个库；**787.6 MB** 资源；客户端 jar SHA1 与 manifest 一致 |
 | `install 1.12.2`（完整资源） | 成功；1290 个 asset、105 个库文件、11 个 native；客户端 SHA1 一致 |
 | 秒装 | 重复安装 1.12.2（含资源）**1.61s**；1.21.1（跳过资源）**1.14s** |
 | 修复 | 删除 `patchy-1.3.9.jar` 后 `repair test-1.12.2`，**3.78s** 恢复 |
@@ -250,5 +250,5 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              DownloadEngine（16MB 阈值分片、8MB/片、Range 续传、顺序 SHA1、镜像回退、URL 安全校验、逐跳重定向）；
              VanillaInstaller（client jar/libraries/natives/assets、legacy virtual、磁盘预检、install journal、状态机）；
              TaskRegistry + ThrottledProgress（10Hz）；Facade install/repair/cancel/retry/getTasks；
-             CLI install/repair；35 项测试通过；1.12.2 完整安装 + 秒装 + 修复已实测。
+             CLI install/repair；35 项测试通过；1.21.1（787.6 MB 资源）与 1.12.2 完整安装、秒装、修复均实测通过。
 ```
