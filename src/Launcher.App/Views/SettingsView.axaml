@@ -1,13 +1,32 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Launcher.App.Views.SettingsView">
-  <StackPanel Margin="28" Spacing="12">
-    <TextBlock Text="设置" FontSize="26" FontWeight="Bold" />
-    <StackPanel Orientation="Horizontal" Spacing="8">
-      <TextBlock Text="最大内存 (MB)" VerticalAlignment="Center" />
-      <TextBox Text="{Binding MaxMemoryMb}" Width="120" />
+  <ScrollViewer>
+    <StackPanel Margin="28" Spacing="12" MaxWidth="520" HorizontalAlignment="Left">
+      <TextBlock Text="设置" FontSize="26" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+      <TextBlock Text="外观与启动偏好（M0 阶段部分项为占位）" FontSize="12" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,8" />
+
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="深色模式" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <ToggleSwitch IsChecked="{Binding IsDarkTheme}" OnContent="深色" OffContent="浅色" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="启动性能" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="最大内存 (MB)" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondary}" />
+            <TextBox Text="{Binding MaxMemoryMb}" Width="120" />
+            <Button Content="保存设置" Command="{Binding SaveCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondary}" />
     </StackPanel>
-    <Button Content="保存设置" Command="{Binding SaveCommand}" />
-    <TextBlock Text="{Binding StatusText}" />
-  </StackPanel>
+  </ScrollViewer>
 </UserControl>

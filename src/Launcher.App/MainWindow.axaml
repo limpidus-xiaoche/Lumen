@@ -2,23 +2,72 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Launcher.App.MainWindow"
         Title="Lumen"
-        Width="960"
-        Height="640"
+        Width="1080"
+        Height="680"
+        MinWidth="960"
+        MinHeight="600"
         WindowStartupLocation="CenterScreen"
-        Background="#12141A">
-  <Grid ColumnDefinitions="220,*">
-    <Border Grid.Column="0" Background="#1B1E26">
-      <StackPanel Margin="16" Spacing="12">
-        <TextBlock Text="Lumen" FontSize="24" FontWeight="Bold" Foreground="#4A9EFF" Margin="8,8,0,12" />
-        <ListBox ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage}" Background="Transparent">
+        Background="{DynamicResource WindowBackground}">
+  <Grid ColumnDefinitions="228,*">
+
+    <!-- 左侧导航栏 -->
+    <Border Grid.Column="0" Background="{DynamicResource SidebarBackground}">
+      <DockPanel>
+
+        <!-- 顶部：低调字标 -->
+        <StackPanel DockPanel.Dock="Top" Margin="20,22,20,8" Orientation="Horizontal" Spacing="10">
+          <Border Width="14" Height="14" CornerRadius="3" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+          <TextBlock Text="Lumen" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- 导航项 -->
+        <ListBox DockPanel.Dock="Top"
+                 Margin="10,12,10,0"
+                 ItemsSource="{Binding Pages}"
+                 SelectedItem="{Binding SelectedPage}"
+                 Background="Transparent"
+                 BorderThickness="0">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="12,9" />
+              <Setter Property="Margin" Value="2,1" />
+              <Setter Property="CornerRadius" Value="6" />
+              <Setter Property="Background" Value="Transparent" />
+              <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+            </Style>
+            <Style Selector="ListBoxItem:pointerover">
+              <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+            </Style>
+            <Style Selector="ListBoxItem:selected">
+              <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+              <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+              <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+          </ListBox.Styles>
           <ListBox.ItemTemplate>
             <DataTemplate>
-              <TextBlock Text="{Binding Title}" Padding="8,6" />
+              <TextBlock Text="{Binding Title}" />
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
-      </StackPanel>
+
+        <!-- 底部：两位作者低调水印 -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="20,0,20,16">
+          <TextBlock Text="麦谷 &amp; Limpidus"
+                     FontSize="11"
+                     Opacity="0.45"
+                     Foreground="{DynamicResource TextMuted}" />
+          <TextBlock Text="Lumen · MC Launcher"
+                     FontSize="9"
+                     Opacity="0.3"
+                     Foreground="{DynamicResource TextMuted}" />
+        </StackPanel>
+      </DockPanel>
     </Border>
-    <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" Margin="8" />
+
+    <!-- 右侧内容区 -->
+    <Border Grid.Column="1" Background="{DynamicResource ContentBackground}">
+      <ContentControl Content="{Binding CurrentPage}" Margin="8" />
+    </Border>
   </Grid>
 </Window>
