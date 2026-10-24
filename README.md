@@ -121,4 +121,9 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
              SSH 认证返回 `Hi limpidus-xiaoche/Lumen!`（说明公钥以 Deploy key 绑定到该仓库）；
              `git ls-remote` 退出码 0 且无 ref → 仓库可读但为空；
              本地 `d:\启动器` 尚未 git init。未执行任何提交或推送。
+
+[2026-10-24] 仓库已接通（写权限验证通过）：
+             本地已 git init（main），首个提交 c2d2f65（README/technoledge/.gitignore/.gitattributes）；
+             远程 origin = git@github.com:limpidus-xiaoche/Lumen.git，main 已推送并跟踪；
+             `_probe/` 已加入 .gitignore，不提交；提交身份使用仓库级 noreply 地址。
 ```

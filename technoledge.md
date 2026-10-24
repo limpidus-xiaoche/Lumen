@@ -583,8 +583,8 @@ CREATE TABLE install_journal(
 
 ### 9.0 仓库与权限（已确认）
 
-- 托管：**GitHub 私有仓库** `limpidus-xiaoche/Lumen`（已实测可读，仓库当前为空）。
-- 认证：两位开发者各用自己的 **SSH 公钥（ed25519）**；当前密钥以 **Deploy key** 方式绑定到该仓库（`ssh -T` 返回 `Hi limpidus-xiaoche/Lumen!`），权限仅限此仓库，不能创建仓库或访问其他仓库。仓库内**不得**存放任何私钥/令牌。
+- 托管：**GitHub 私有仓库** `limpidus-xiaoche/Lumen`（已实测**可读可写**；`main` 已推送首个提交）。
+- 认证：两位开发者各用自己的 **SSH 公钥（ed25519）**；当前密钥以 **Deploy key** 方式绑定到该仓库（`ssh -T` 返回 `Hi limpidus-xiaoche/Lumen!`），**已验证具备写权限**，但权限仅限此仓库，不能创建仓库或访问其他仓库。仓库内**不得**存放任何私钥/令牌。
 - `main` 分支保护：禁止直接 push、禁止 force push；所有改动走 PR，需**对方 1 个 approve**。
 - `CODEOWNERS`：`src/Launcher.Core/**`、`src/Launcher.Cli/**`、`tests/Launcher.Core.Tests/**`、`tests/Launcher.Integration.Tests/Core/**` → A；`src/Launcher.App/**`、`tests/Launcher.App.Tests/**`、`tests/Launcher.Integration.Tests/App/**` → B；`Launcher.Protocol/**` 与根目录文档 → 双方。
 - **账号等级（已确认：Free）**：私有仓 rulesets / CODEOWNERS 强制 review 不可用。执行降级方案：`main` 保护改为团队约定 + pre-push hook（拒绝直接推 main）+ PR 模板 + CI 必绿；`CODEOWNERS` 仍保留，作为 review 路由而非强制门禁。
