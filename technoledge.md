@@ -59,7 +59,7 @@
 | 数据库 | Microsoft.Data.Sqlite（WAL） | |
 | 更新/分发 | **Velopack only**（`Setup.exe` + delta + `Portable.zip`） | 不再产出 MSI，避免两套安装器互相覆盖 |
 | 架构测试 | NetArchTest.Rules | 守护 §3 的三条规则 |
-| 复用库（可选） | **CmlLib.Core（MIT，M1 前评估）** | 只复用其元数据/下载/启动原语，接口仍由 `Launcher.Core` 定义；**不引入 PCL 源码** |
+| 复用库（可选） | **CmlLib.Core（MIT，M1 前优先评估）** | 只复用其元数据/下载/启动原语，接口仍由 `Launcher.Core` 定义；**不引入 PCL 源码** |
 | 代码签名 | **不做**（无 Authenticode，也无应用层公钥签名） | 决策已定；未签名发布，靠 HTTPS + SHA-256 + SmartScreen 引导 |
 | 完整性校验 | **SHA-256 清单**（自身 `integrity.json` + 更新清单 `sha256`） | v1 必做；安全边界见 §12.1 |
 
@@ -725,7 +725,7 @@ docs: 契约 v0.4
 | Serilog（含 `Sinks.File`） | Apache-2.0 | 是 | 文件日志 |
 | System.CommandLine | MIT | 是 | CLI 解析 |
 | NetArchTest.Rules | MIT（待复核） | 否 | 仅测试 |
-| CmlLib.Core | MIT（已复核） | 待定 | M1 前评估；若引入仅作元数据/下载/启动原语 |
+| CmlLib.Core | MIT（已复核） | 待定（优先评估） | M1 前评估；若引入仅作元数据/下载/启动原语 |
 
 > BCL 自带项（如 `Microsoft.Win32.Registry`）无需登记，但在 `THIRD_PARTY_NOTICES.md` 里要说明运行时依赖清单。
 
@@ -780,6 +780,7 @@ docs: 契约 v0.4
 | 17 | GitHub 计划 | **Free**：分支保护不可用 → 约定 + pre-push hook + CI | CODEOWNERS 仅作 review 路由 |
 | 18 | 是否 fork PCL2 | **不 fork，也不复制其代码/资源** | 许可证为《PCL 分发有限许可》+ 合理使用指南；重度使用要求「PCL 开头命名 + 关于页署名 + 公开源码并沿用指南 + 正版/赞助劝导 + Windows 主色相蓝色」，与 MIT/Lumen 直接冲突 |
 | 19 | 避免重复造轮子 | M1 前评估 **CmlLib.Core（MIT）** 覆盖元数据/下载/启动原语；接口不变 | 不引入 PCL 代码；评估结论在 M1 前落文档 |
+| 20 | 是否 fork XMCL | **否决**（保持路线 C） | XMCL 为 MIT、Electron/TypeScript，功能完整；但与 .NET/Avalonia 栈不兼容，切换需整体转 Node。仅作 UX 参考，不复制代码 |
 
 ---
 
@@ -869,3 +870,4 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 | v0.4 P2 工程细节 | §6.7（None 目录）、§6.8（crash 保留）、§7（便携回退）、§8.2（i18n/E5003 内部）、§11（新增用例）、§12（组件表） |
 | v0.4 版本记账 | 头部、§2/§3/§5/§7/§10/§11/§15/§17 标题、§5 契约表 |
 | 补充：PCL2 许可核实 | §2（复用库）、§12（PCL2 边界 + 组件表）、§13-18/19 | 结论：不 fork；评估 CmlLib.Core（MIT） |
+| 补充：XMCL 评估 | §2（复用库）、§12（组件表）、§13-20 | 结论：MIT 可 fork，但决定不切换；维持 .NET + CmlLib.Core |

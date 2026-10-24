@@ -20,6 +20,7 @@
 - [x] `technoledge.md` **v0.4**：数据目录拆分（Roaming/Local）、argfile 竞态与编码、完整性校验时机、门面补口、CurseForge 决策项
 - [x] CurseForge 方案拍板：**C**（Modrinth/HMCL/MultiMC；CF 仅直链包，M7 不验收 CF API）
 - [x] GitHub 账号等级确认：**Free**（分支保护降级为约定 + pre-push hook + CI，CODEOWNERS 仅作 review 路由）
+- [x] XMCL 评估（MIT，可 fork）：**放弃**；维持路线 C（.NET 10 + Avalonia + CmlLib.Core），XMCL 仅作 UX 参考
 - [x] `technoledge.md` **v0.3 复审**（2026-10-24）：新增 P0 5 项 / P1 16 项 / P2 11 项，见下「v0.3 复审记录」
 - [x] `technoledge.md` 升版 **v0.4** 完成：P0-1..P0-5 全部落位（CF=C、GitHub=Free）
 - [ ] M0：解决方案骨架（**用户要求暂不搭建**）
@@ -65,10 +66,11 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 - 平台：**v1 仅 Windows 10/11 x64**；跨平台列入 v2 非目标（DPAPI / 注册表 / 签名均为平台相关）。
 - 技术栈：`.NET 10 LTS`（环境不一致则统一 `.NET 8 LTS`，单一 TFM 由 `global.json` 钉死）+ `Avalonia 11` + `CommunityToolkit.Mvvm` + `Polly.Core`；`System.Text.Json` 源生成；SQLite 存索引，JSON 存配置。
 - 形态：单进程 GUI + 可复用 `Launcher.Core` 类库 + `Launcher.Cli`（内核可被 CLI/测试直接驱动）；`Core` 不引用任何 UI 类型。
-- 规避 32K 命令行：Java 9+ 用 `@argfile`（启动后立即删除 + ACL 收紧）；Java 8 回退 wrapper jar（对标 PCL2 JavaWrapper）。
+- 规避 32K 命令行：Java 9+ 用 `@argfile`（**等首行 stdout 后删除** + ACL 收紧）；Java 8 回退 wrapper jar（对标 PCL2 JavaWrapper）。
 - Forge/NeoForge：≤1.12.2 使用 `com.bangbang93.ForgeInstaller`（**许可证核验为发布门禁**），1.13+ 走官方 installer；`authlib-injector` 不随包分发。分发只用 Velopack（`Setup.exe` + delta + Portable zip），不产 MSI。
 - 完整性：**不签名**（无 Authenticode、无应用层公钥签名），只用 **SHA-256 清单**（自身 `integrity.json` + 更新清单）并 fail-closed；安全边界与残余风险见 technoledge §12.1。
 - 仓库：**GitHub 私有**，两位开发者各自 SSH 公钥（ed25519），`main` 保护 + 对方 1 approve，CODEOWNERS 按 A/B 目录划分。
+- 复用策略：优先评估 **CmlLib.Core（MIT）** 覆盖元数据/下载/启动原语；**不 fork XMCL / PCL2**，XMCL 仅作 UX 参考。
 - 许可证：本项目 **MIT**；随包第三方必须与 MIT 兼容，不兼容者仅运行期下载/调用，并登记 `THIRD_PARTY_NOTICES.md`。
 - v1 范围：元数据 → 安装 → 启动 → Java 管理 → 离线/微软/外置登录 → 实例隔离 → 模组/整合包 → 自更新。AI/联机/皮肤站作为 v2。
 
@@ -131,4 +133,10 @@ P2（工程细节）：DB 缺字段/迁移、无安装事务与实例状态机�
 [2026-10-24] 许可证核实（PCL2）：仓库采用《PCL 分发有限许可》+《合理使用指南》，非 MIT/Apache；
              重度使用条款（PCL 开头命名/蓝色主色/署名+赞助/沿用指南）与本项目 MIT+Lumen 冲突；
              结论：不 fork、不复制代码与资源；改为评估 CmlLib.Core（MIT）复用元数据/下载/启动原语。
+
+[2026-10-24] 评估 XMCL（X Minecraft Launcher，voxelum，MIT，Electron + TypeScript）：
+             许可证允许 fork/改名/闭源分发，只需保留版权与许可声明；
+             其 @xmcl/core、installer、user、curseforge、modrinth、file-transfer 等包覆盖启动器核心；
+             但与 Lumen 的 .NET/Avalonia 栈不兼容——直接复用需整体转 Node/Electron，或增加 Node sidecar。
+             结论（已拍板）：**放弃 fork XMCL，维持路线 C**（.NET + CmlLib.Core）；XMCL 仅作 UX 参考。
 ```
