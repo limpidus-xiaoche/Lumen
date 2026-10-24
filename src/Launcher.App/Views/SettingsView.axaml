@@ -26,6 +26,16 @@
         </StackPanel>
       </Border>
 
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="其他入口" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="实例管理" Command="{Binding OpenInstancesCommand}" />
+            <Button Content="查看日志" Command="{Binding OpenLogsCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
       <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondary}" />
     </StackPanel>
   </ScrollViewer>

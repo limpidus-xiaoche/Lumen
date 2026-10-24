@@ -39,14 +39,14 @@
           <SolidColorBrush x:Key="HoverBrush" Color="#1A2029" />
           <SolidColorBrush x:Key="BorderBrush" Color="#232936" />
           <SolidColorBrush x:Key="TextPrimary" Color="#E8EAED" />
-          <SolidColorBrush x:Key="TextSecondary" Color="#9AA3B2" />
-          <SolidColorBrush x:Key="TextMuted" Color="#6B7686" />
-          <SolidColorBrush x:Key="AccentBrush" Color="#4A9EFF" />
-          <SolidColorBrush x:Key="AccentSoft" Color="#22314A" />
-          <SolidColorBrush x:Key="AccentGlow" Color="#5BABFF" />
+          <SolidColorBrush x:Key="TextSecondary" Color="#A0A8B0" />
+          <SolidColorBrush x:Key="TextMuted" Color="#6E7782" />
+          <SolidColorBrush x:Key="AccentBrush" Color="#2BD4C4" />
+          <SolidColorBrush x:Key="AccentSoft" Color="#1A4A42" />
+          <SolidColorBrush x:Key="AccentGlow" Color="#57E5D5" />
         </ResourceDictionary>
 
-        <!-- 浅色主题：干净白灰 + 同系蓝 -->
+        <!-- 浅色主题：干净白灰 + 同系青 -->
         <ResourceDictionary x:Key="Light">
           <SolidColorBrush x:Key="SidebarBackground" Color="#EFF2F6" />
           <SolidColorBrush x:Key="WindowBackground" Color="#F5F7FA" />
@@ -55,11 +55,11 @@
           <SolidColorBrush x:Key="HoverBrush" Color="#E7EBF0" />
           <SolidColorBrush x:Key="BorderBrush" Color="#DDE2E8" />
           <SolidColorBrush x:Key="TextPrimary" Color="#1B2230" />
-          <SolidColorBrush x:Key="TextSecondary" Color="#5A6472" />
-          <SolidColorBrush x:Key="TextMuted" Color="#8B94A3" />
-          <SolidColorBrush x:Key="AccentBrush" Color="#2F6FE4" />
-          <SolidColorBrush x:Key="AccentSoft" Color="#E1EAF9" />
-          <SolidColorBrush x:Key="AccentGlow" Color="#3D7BF2" />
+          <SolidColorBrush x:Key="TextSecondary" Color="#5C6570" />
+          <SolidColorBrush x:Key="TextMuted" Color="#8B93A0" />
+          <SolidColorBrush x:Key="AccentBrush" Color="#0E9C8F" />
+          <SolidColorBrush x:Key="AccentSoft" Color="#D8F0EB" />
+          <SolidColorBrush x:Key="AccentGlow" Color="#12ADA0" />
         </ResourceDictionary>
 
       </ResourceDictionary.ThemeDictionaries>
