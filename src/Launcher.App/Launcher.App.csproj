@@ -22,4 +22,7 @@
     <ProjectReference Include="..\Launcher.Protocol\Launcher.Protocol.csproj" />
     <ProjectReference Include="..\Launcher.Render\Launcher.Render.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**\*.png" />
+  </ItemGroup>
 </Project>

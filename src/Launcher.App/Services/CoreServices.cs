@@ -37,7 +37,8 @@ public sealed class CoreServices
 
         var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
         var manifest = new ManifestClient(paths);
-        var resolver = new VersionResolver(manifest, paths);
+        var loaderMeta = new LoaderMetaClient(paths);
+        var resolver = new VersionResolver(manifest, paths, loaderMeta);
         var javaLocator = new JavaLocator(paths);
         var downloads = new DownloadEngine();
         var loaderCatalog = new LoaderCatalog();
@@ -76,15 +77,16 @@ public sealed class CoreServices
             settings,
             sqlite,
             loggerFactory.CreateLogger<LauncherFacade>(),
-            manifest,
-            javaLocator,
-            installer,
-            new TaskRegistry(),
-            launcher,
-            accounts,
-            microsoft,
-            authlib,
-            loaderCatalog);
+            manifestClient: manifest,
+            javaLocator: javaLocator,
+            installer: installer,
+            tasks: new TaskRegistry(sqlite),
+            launcher: launcher,
+            accounts: accounts,
+            microsoft: microsoft,
+            authlib: authlib,
+            loaderCatalog: loaderCatalog,
+            loaderMeta: loaderMeta);
 
         return new CoreServices(paths, facade);
     }

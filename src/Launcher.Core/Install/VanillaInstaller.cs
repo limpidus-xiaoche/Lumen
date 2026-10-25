@@ -14,6 +14,7 @@ public sealed class VanillaInstaller
     private static readonly InstallStage[] StageOrder =
     [
         InstallStage.VersionJson,
+        InstallStage.Loader,
         InstallStage.ClientJar,
         InstallStage.Libraries,
         InstallStage.Natives,
@@ -77,11 +78,22 @@ public sealed class VanillaInstaller
         {
             await JournalAsync(instanceId, InstallStage.VersionJson, "start", request.VersionId, ct);
             Report(progress, InstallStage.VersionJson, 20, "解析版本 JSON");
-            var detail = await _resolver.ResolveAsync(request.VersionId, ct);
+            var detail = await _resolver.ResolveAsync(
+                request.VersionId, request.Loader, request.LoaderVersion, ct);
             var mergedJson = JsonSerializer.Serialize(detail, new JsonSerializerOptions { WriteIndented = true });
             AtomicFile.WriteAllText(Path.Combine(versionDir, $"{request.VersionId}.json"), mergedJson);
             Report(progress, InstallStage.VersionJson, 100, "版本 JSON 已保存");
             await JournalAsync(instanceId, InstallStage.VersionJson, "done", request.VersionId, ct);
+
+            if (request.Loader == LoaderKind.Vanilla || request.LoaderVersion is null)
+            {
+                Report(progress, InstallStage.Loader, 100, "原版（无加载器）");
+            }
+            else
+            {
+                Report(progress, InstallStage.Loader, 100, $"{request.Loader} {request.LoaderVersion} 已合并");
+            }
+            await JournalAsync(instanceId, InstallStage.Loader, "done", request.LoaderVersion ?? string.Empty, ct);
 
             var client = detail.Downloads?.Client;
             if (client?.Url is not null)
@@ -175,11 +187,20 @@ public sealed class VanillaInstaller
             }
             else if (artifact is null && library.Downloads is null && !string.IsNullOrWhiteSpace(library.Name))
             {
+                // 加载器 profile 里的库只给仓库根地址（如 maven.fabricmc.net），需要自己拼 maven 路径。
                 var relative = MavenPath(library.Name);
                 var dest = PathGuard.EnsureWithin(_paths.SharedDir, Path.Combine(_paths.SharedDir, "libraries", relative));
+                var repository = string.IsNullOrWhiteSpace(library.Url)
+                    ? "https://libraries.minecraft.net/"
+                    : library.Url!;
+                if (!repository.EndsWith('/'))
+                {
+                    repository += "/";
+                }
+
                 items.Add(new DownloadItem(
-                    $"https://libraries.minecraft.net/{relative.Replace('\\', '/')}",
-                    dest, null, 0, DownloadKind.Library));
+                    repository + relative.Replace('\\', '/'),
+                    dest, library.Sha1, library.Size, DownloadKind.Library));
             }
 
             var classifier = NativeClassifier(library);

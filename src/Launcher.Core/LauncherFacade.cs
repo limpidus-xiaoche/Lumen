@@ -1,3 +1,7 @@
+using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Launcher.Core.Accounts;
 using Launcher.Core.Auth;
 using Launcher.Core.Diagnostics;
@@ -32,6 +36,9 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly IntegrityService _integrity;
     private readonly UpdateService _update;
     private readonly DiagnosticsExporter _diagnostics;
+    private readonly ModrinthClient _modrinth;
+    private readonly CurseForgeClient _curseForge;
+    private readonly LoaderMetaClient? _loaderMeta;
 
     public LauncherFacade(
         LauncherPaths paths,
@@ -43,6 +50,7 @@ public sealed class LauncherFacade : ILauncherFacade
         VanillaInstaller? installer = null,
         TaskRegistry? tasks = null,
         LaunchService? launcher = null,
+        LoaderMetaClient? loaderMeta = null,
         AccountStore? accounts = null,
         MicrosoftAuth? microsoft = null,
         AuthlibAuth? authlib = null,
@@ -61,6 +69,7 @@ public sealed class LauncherFacade : ILauncherFacade
         _installer = installer;
         _tasks = tasks ?? new TaskRegistry();
         _launcher = launcher;
+        _loaderMeta = loaderMeta;
         _accounts = accounts;
         _microsoft = microsoft;
         _authlib = authlib;
@@ -70,6 +79,8 @@ public sealed class LauncherFacade : ILauncherFacade
         _update = updateService ?? new UpdateService(paths, integrity: _integrity);
         _diagnostics = diagnostics
                        ?? new DiagnosticsExporter(paths, settingsStore, sqlite, javaLocator);
+        _modrinth = new ModrinthClient(paths.CacheDir);
+        _curseForge = new CurseForgeClient(paths.CacheDir);
     }
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
@@ -101,12 +112,14 @@ public sealed class LauncherFacade : ILauncherFacade
     public Task<IReadOnlyList<LoaderVersionInfo>> GetLoaderVersionsAsync(
         LoaderKind loader, string gameVersion, CancellationToken ct)
     {
-        if (_loaderCatalog is null)
+        if (_loaderCatalog is not null)
         {
-            return Task.FromResult<IReadOnlyList<LoaderVersionInfo>>(Array.Empty<LoaderVersionInfo>());
+            return _loaderCatalog.GetVersionsAsync(loader, gameVersion, ct);
         }
 
-        return _loaderCatalog.GetVersionsAsync(loader, gameVersion, ct);
+        return _loaderMeta is null
+            ? Task.FromResult<IReadOnlyList<LoaderVersionInfo>>(Array.Empty<LoaderVersionInfo>())
+            : _loaderMeta.GetVersionsAsync(loader, gameVersion, ct);
     }
 
     public async Task<InstanceDetail> GetInstanceAsync(string instanceId, CancellationToken ct)
@@ -126,8 +139,11 @@ public sealed class LauncherFacade : ILauncherFacade
             DiskUsageBytes: 0);
     }
 
-    public Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct) =>
-        Task.FromResult(_tasks.Snapshot());
+    public async Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct)
+    {
+        await _tasks.RestoreAsync(ct);
+        return _tasks.Snapshot();
+    }
 
     public Task CancelTaskAsync(string taskId, CancellationToken ct)
     {
@@ -376,7 +392,18 @@ public sealed class LauncherFacade : ILauncherFacade
     public async Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct)
     {
         var (instance, gameDir) = await FindInstanceAsync(instanceId, ct);
-        return ModScanner.Scan(gameDir, instance.Loader);
+        var modsDir = Path.Combine(gameDir, "mods");
+        return ModScanner.Scan(gameDir, instance.Loader)
+            .Select(m => m.IconPath is null
+                ? m with
+                {
+                    IconPath = TryExtractIcon(
+                        m.FileName.Replace(".jar.disabled", string.Empty, StringComparison.OrdinalIgnoreCase),
+                        Path.Combine(modsDir, m.FileName),
+                        iconEntry: null),
+                }
+                : m)
+            .ToArray();
     }
 
     public async Task SetModEnabledAsync(
@@ -387,6 +414,144 @@ public sealed class LauncherFacade : ILauncherFacade
         {
             throw new KeyNotFoundException($"模组不存在：{modId}");
         }
+    }
+
+    /// <summary>把外部 jar 复制到实例的 mods 目录。</summary>
+    public async Task ImportModAsync(string instanceId, string sourceJarPath, CancellationToken ct)
+    {
+        var dir = await ModsDir(instanceId, ct);
+        Directory.CreateDirectory(dir);
+        File.Copy(sourceJarPath, Path.Combine(dir, Path.GetFileName(sourceJarPath)), overwrite: true);
+    }
+
+    public Task<IReadOnlyList<OnlineModSummary>> SearchOnlineModsAsync(
+        ModSource source, string query, string? modCategory, LoaderKind? loader, string? gameVersion, int page, CancellationToken ct) =>
+        source == ModSource.CurseForge
+            ? _curseForge.SearchAsync(query, loader, gameVersion, page, ct)
+            : _modrinth.SearchAsync(query, modCategory, ModrinthClient.LoaderName(loader), gameVersion, page, ct);
+
+    public async Task<string> InstallOnlineModAsync(
+        string instanceId, ModSource source, string projectId, string? gameVersion, LoaderKind loader,
+        IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        var modsDir = await ModsDir(instanceId, ct);
+        return source == ModSource.CurseForge
+            ? await _curseForge.InstallAsync(modsDir, projectId, gameVersion, loader, progress, ct)
+            : await _modrinth.InstallAsync(
+                modsDir, projectId, gameVersion, ModrinthClient.LoaderName(loader), progress, ct);
+    }
+
+    /// <summary>读取 Fabric 元数据（id / 名称 / 版本 / 图标入口），非 Fabric 模组返回全空。</summary>
+    private static (string? Id, string? Name, string? Version, string? IconEntry) ReadModMeta(string jarPath)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(jarPath);
+            var entry = zip.GetEntry("fabric.mod.json");
+            if (entry is null)
+            {
+                return (null, null, null, null);
+            }
+
+            using var stream = entry.Open();
+            using var doc = JsonDocument.Parse(stream);
+            var root = doc.RootElement;
+
+            var id = root.TryGetProperty("id", out var i) ? i.GetString() : null;
+            var name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
+            var version = root.TryGetProperty("version", out var v) ? v.GetString() : null;
+
+            string? icon = null;
+            if (root.TryGetProperty("icon", out var iconElement))
+            {
+                icon = iconElement.ValueKind == JsonValueKind.String
+                    ? iconElement.GetString()
+                    : iconElement.ValueKind == JsonValueKind.Object && iconElement.TryGetProperty("64", out var i64)
+                        ? i64.GetString()
+                        : null;
+            }
+
+            return (id, name, version, icon);
+        }
+        catch
+        {
+            return (null, null, null, null);
+        }
+    }
+
+    /// <summary>从 jar 中提取图标到缓存目录，供界面显示。</summary>
+    private string? TryExtractIcon(string baseFileName, string jarPath, string? iconEntry)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(jarPath);
+            var entry = (iconEntry is null ? null : zip.GetEntry(iconEntry.Replace('\\', '/')))
+                        ?? zip.GetEntry("icon.png")
+                        ?? zip.GetEntry("logo.png")
+                        ?? zip.GetEntry("pack.png");
+
+            if (entry is null)
+            {
+                return null;
+            }
+
+            var dir = Path.Combine(_paths.CacheDir, "mod-icons");
+            Directory.CreateDirectory(dir);
+            var hash = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(baseFileName)))[..16];
+            var target = Path.Combine(dir, hash + ".png");
+
+            entry.ExtractToFile(target, overwrite: true);
+            return target;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task DeleteModAsync(string instanceId, string modId, CancellationToken ct)
+    {
+        var path = await FindModFile(instanceId, modId, ct)
+            ?? throw new FileNotFoundException($"模组不存在：{modId}");
+
+        File.Delete(path);
+    }
+
+    private async Task<string> ModsDir(string instanceId, CancellationToken ct)
+    {
+        var (_, gameDir) = await FindInstanceAsync(instanceId, ct);
+        return Path.Combine(gameDir, "mods");
+    }
+
+    /// <summary>按模组 Id（Fabric id 或文件名）定位已安装的 jar。</summary>
+    private async Task<string?> FindModFile(string instanceId, string modId, CancellationToken ct)
+    {
+        var dir = await ModsDir(instanceId, ct);
+        if (!Directory.Exists(dir))
+        {
+            return null;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(dir, "*.jar*"))
+        {
+            var fileName = Path.GetFileName(file);
+            var baseName = fileName.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase)
+                ? fileName[..^".disabled".Length]
+                : fileName;
+
+            if (string.Equals(baseName, modId, StringComparison.OrdinalIgnoreCase))
+            {
+                return file;
+            }
+
+            if (string.Equals(ReadModMeta(file).Id, modId, StringComparison.OrdinalIgnoreCase))
+            {
+                return file;
+            }
+        }
+
+        return null;
     }
 
     public async Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct)

@@ -23,7 +23,8 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var useFake = desktop.Args?.Contains("--fake", StringComparer.OrdinalIgnoreCase) == true;
+            var useFake = desktop.Args?.Contains("--fake", StringComparer.OrdinalIgnoreCase) == true
+                          || Environment.GetEnvironmentVariable("LUMEN_FAKE") == "1";
             ILauncherFacade facade;
             try
             {

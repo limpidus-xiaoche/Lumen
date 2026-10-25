@@ -8,6 +8,7 @@ artifacts/
 publish/
 build/
 dist/
+.tmpbuild/
 *.nupkg
 *.snupkg
 

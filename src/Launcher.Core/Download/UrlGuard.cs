@@ -32,6 +32,7 @@ public static class UrlGuard
         "meta.fabricmc.net",
         "maven.fabricmc.net",
         "files.minecraftforge.net",
+        "maven.quiltmc.org",
         "github.com",
         "api.github.com",
         "objects.githubusercontent.com",

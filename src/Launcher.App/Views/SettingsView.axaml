@@ -1,33 +1,67 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Launcher.App.Views.SettingsView">
-  <StackPanel Margin="28" Spacing="12">
-    <TextBlock Text="设置" FontSize="26" FontWeight="Bold" />
+  <ScrollViewer>
+    <StackPanel Margin="28" Spacing="12" MaxWidth="520" HorizontalAlignment="Left">
+      <TextBlock Text="设置" FontSize="26" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+      <TextBlock Text="外观与启动偏好（M1 起接入真实门面）" FontSize="12" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,8" />
 
-    <StackPanel Orientation="Horizontal" Spacing="8">
-      <TextBlock Text="最大内存 (MB)" VerticalAlignment="Center" />
-      <TextBox Text="{Binding MaxMemoryMb}" Width="120" />
-      <Button Content="保存设置" Command="{Binding SaveCommand}" />
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="深色模式" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <ToggleSwitch IsChecked="{Binding IsDarkTheme}" OnContent="深色" OffContent="浅色" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="启动性能" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="最大内存 (MB)" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondary}" />
+            <TextBox Text="{Binding MaxMemoryMb}" Width="120" />
+            <Button Content="保存设置" Command="{Binding SaveCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Java 运行时" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="刷新 Java 列表" Command="{Binding LoadJavasCommand}" />
+            <TextBlock Text="{Binding JavaStatusText}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondary}" FontSize="12" />
+          </StackPanel>
+          <ScrollViewer Height="220">
+            <ItemsControl ItemsSource="{Binding Javas}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Padding="10" Margin="0,3" Background="{DynamicResource ContentBackground}" CornerRadius="6"
+                          BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="{Binding Path}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource TextPrimary}" />
+                      <TextBlock Text="{Binding Vendor}" Foreground="{DynamicResource TextMuted}" FontSize="11" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </StackPanel>
+      </Border>
+
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="其他入口" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="实例管理" Command="{Binding OpenInstancesCommand}" />
+            <Button Content="查看日志" Command="{Binding OpenLogsCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondary}" />
     </StackPanel>
-    <TextBlock Text="{Binding StatusText}" Opacity="0.7" />
-
-    <Separator Margin="0,8" />
-    <TextBlock Text="Java" FontSize="18" FontWeight="SemiBold" />
-    <Button Content="刷新 Java 列表" Command="{Binding LoadJavasCommand}" HorizontalAlignment="Left" />
-    <TextBlock Text="{Binding JavaStatusText}" Opacity="0.7" />
-    <ScrollViewer Height="260">
-      <ItemsControl ItemsSource="{Binding Javas}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <Border Padding="10" Margin="0,3" Background="#1B1E26" CornerRadius="6">
-              <StackPanel Spacing="2">
-                <TextBlock Text="{Binding Path}" FontFamily="Consolas" />
-                <TextBlock Text="{Binding Vendor}" Opacity="0.6" />
-              </StackPanel>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </ScrollViewer>
-  </StackPanel>
+  </ScrollViewer>
 </UserControl>

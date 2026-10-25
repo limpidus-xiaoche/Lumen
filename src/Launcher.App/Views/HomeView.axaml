@@ -1,13 +1,94 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Launcher.App.Views.HomeView">
-  <StackPanel Margin="28" Spacing="14">
-    <TextBlock Text="首页" FontSize="26" FontWeight="Bold" />
-    <TextBlock Text="{Binding StatusText}" />
-    <ProgressBar Value="{Binding InstallProgress}" Maximum="100" Height="8" />
-    <StackPanel Orientation="Horizontal" Spacing="8">
-      <Button Content="刷新快照" Command="{Binding RefreshCommand}" />
-      <Button Content="模拟安装" Command="{Binding SimulateInstallCommand}" />
+  <Grid>
+    <StackPanel HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="14"
+                Margin="24">
+
+      <!-- 账号区（PCL2 风格，位于启动按钮上方）：登录方式 + 皮肤头像 + 用户名 -->
+      <StackPanel Spacing="6" HorizontalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
+          <RadioButton Classes="mode-pill" GroupName="AuthMode"
+                       Content="离线" Padding="14,6" FontSize="13"
+                       IsChecked="{Binding $parent[Window].DataContext.Accounts.OfflineMode}" />
+          <RadioButton Classes="mode-pill" GroupName="AuthMode"
+                       Content="正版" Padding="14,6" FontSize="13"
+                       IsChecked="{Binding $parent[Window].DataContext.Accounts.OnlineMode}" />
+        </StackPanel>
+        <Border Width="64" Height="64" CornerRadius="10"
+                Background="{DynamicResource ContentBackground}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                ClipToBounds="True"
+                HorizontalAlignment="Center">
+          <Image Source="{Binding $parent[Window].DataContext.Accounts.Avatar}"
+                 RenderOptions.BitmapInterpolationMode="None"
+                 Stretch="UniformToFill" />
+        </Border>
+        <TextBlock Text="{Binding $parent[Window].DataContext.Accounts.Username}"
+                   FontSize="13" FontWeight="SemiBold"
+                   HorizontalAlignment="Center"
+                   Foreground="{DynamicResource TextPrimary}" />
+      </StackPanel>
+
+      <!-- 大启动按钮（PCL2 风格，青色系） -->
+      <Button Command="{Binding LaunchCommand}"
+              HorizontalAlignment="Center"
+              Padding="90,18"
+              CornerRadius="14"
+              FontSize="22"
+              FontWeight="SemiBold"
+              Background="{DynamicResource AccentBrush}"
+              Foreground="#F4FFFD"
+              Content="启动游戏">
+        <Button.Styles>
+          <Style Selector="Button:pointerover">
+            <Setter Property="Opacity" Value="0.88" />
+          </Style>
+          <Style Selector="Button:pressed">
+            <Setter Property="Opacity" Value="0.7" />
+          </Style>
+        </Button.Styles>
+      </Button>
+
+      <!-- 当前实例版本信息 -->
+      <TextBlock Text="{Binding VersionText}"
+                 FontSize="15"
+                 HorizontalAlignment="Center"
+                 Foreground="{DynamicResource TextSecondary}" />
+
+      <!-- 实例选择 + 版本设置（并列，PCL2 风格的双按钮行） -->
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+        <ComboBox ItemsSource="{Binding Instances}"
+                  SelectedItem="{Binding SelectedInstance}"
+                  Width="196" Height="40" FontSize="13"
+                  VerticalContentAlignment="Center">
+          <ComboBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <Button Content="版本设置"
+                Command="{Binding OpenVersionSettingsCommand}"
+                Width="112" Height="40"
+                Padding="0"
+                CornerRadius="10"
+                FontSize="13"
+                HorizontalContentAlignment="Center"
+                Background="{DynamicResource CardBackground}"
+                Foreground="{DynamicResource TextPrimary}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1" />
+      </StackPanel>
+
+      <TextBlock Text="{Binding StatusText}"
+                 FontSize="12"
+                 HorizontalAlignment="Center"
+                 Foreground="{DynamicResource TextMuted}" />
     </StackPanel>
-  </StackPanel>
+  </Grid>
 </UserControl>

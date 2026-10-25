@@ -8,5 +8,7 @@
         WindowDecorations="None"
         CanResize="False"
         Background="#05030A">
+  <!-- 默认视图：S1 沉浸式 Shell。经典 PCL 布局保留在 Shell/ClassicShell.axaml，
+       后续 S 阶段再接入切换入口。 -->
   <shell:ImmersiveShell />
 </Window>

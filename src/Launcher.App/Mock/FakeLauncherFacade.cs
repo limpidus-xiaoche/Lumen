@@ -27,6 +27,16 @@ public sealed class FakeLauncherFacade : ILauncherFacade
             DateTimeOffset.Now.AddMinutes(-5),
             "0.1.0-m0"));
 
+    /// <summary>任务中心演示数据：覆盖进行中、不确定进度、失败与重启中断四种状态。</summary>
+    private readonly List<TaskInfo> _tasks =
+    [
+        new("fake-task-run", "demo-fabric", TaskKind.Install, TaskState.Running, 42, "依赖库 · 32/78", 1, null),
+        new("fake-task-unknown", "demo-vanilla", TaskKind.Install, TaskState.Running, -1, "正在解析版本清单", 1, null),
+        new("fake-task-failed", "demo-vanilla", TaskKind.Repair, TaskState.Failed, 60, "下载失败：连接超时", 2, "E2001"),
+        new("fake-task-interrupted", "demo-fabric", TaskKind.Install, TaskState.Failed, 20, "上次运行中断（可修复）", 1, TaskErrorCodes.Interrupted),
+        new("fake-task-done", "demo-vanilla", TaskKind.Install, TaskState.Succeeded, 100, "安装完成", 1, null),
+    ];
+
     public Task<VersionManifest> RefreshManifestAsync(ManifestRefreshMode mode, CancellationToken ct) =>
         Task.FromResult(new VersionManifest(new LatestVersions("1.21.1", "26.4-snapshot-5"),
         [
@@ -46,12 +56,54 @@ public sealed class FakeLauncherFacade : ILauncherFacade
             summary, Path.Combine(@"C:\Lumen\instances", instanceId), null, 4096, string.Empty, 12, 1_234_567));
     }
 
-    public Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<TaskInfo>>([]);
+    public Task<IReadOnlyList<TaskInfo>> GetTasksAsync(CancellationToken ct)
+    {
+        lock (_tasks)
+        {
+            return Task.FromResult<IReadOnlyList<TaskInfo>>(_tasks.ToArray());
+        }
+    }
 
-    public Task CancelTaskAsync(string taskId, CancellationToken ct) => Task.CompletedTask;
+    public Task CancelTaskAsync(string taskId, CancellationToken ct)
+    {
+        lock (_tasks)
+        {
+            var index = _tasks.FindIndex(t => t.TaskId == taskId);
+            if (index >= 0)
+            {
+                _tasks[index] = _tasks[index] with
+                {
+                    State = TaskState.Cancelled,
+                    Message = "已取消",
+                };
+            }
+        }
 
-    public Task RetryTaskAsync(string taskId, CancellationToken ct) => Task.CompletedTask;
+        return Task.CompletedTask;
+    }
+
+    public Task RetryTaskAsync(string taskId, CancellationToken ct)
+    {
+        lock (_tasks)
+        {
+            var index = _tasks.FindIndex(t => t.TaskId == taskId);
+            if (index >= 0)
+            {
+                var source = _tasks[index];
+                _tasks[index] = source with
+                {
+                    TaskId = Guid.NewGuid().ToString("N"),
+                    State = TaskState.Running,
+                    Percent = 0,
+                    Message = "重新开始",
+                    Attempts = source.Attempts + 1,
+                    ErrorCode = null,
+                };
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 
     public async Task<InstanceSummary> InstallAsync(
         InstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
@@ -62,15 +114,52 @@ public sealed class FakeLauncherFacade : ILauncherFacade
             InstallStage.Natives, InstallStage.Assets, InstallStage.Loader, InstallStage.Finalizing,
         };
 
+        // 契约约定：Fake 每 200ms 报一次假进度；前期阶段总量未知，Percent = -1（不确定态）
+        var taskId = Guid.NewGuid().ToString("N");
+        lock (_tasks)
+        {
+            _tasks.Insert(0, new TaskInfo(
+                taskId, request.InstanceId, TaskKind.Install, TaskState.Running, -1, "准备安装", 1, null));
+        }
+
         for (var i = 0; i < stages.Length; i++)
         {
-            var percent = (i + 1) * 100d / stages.Length;
+            var percent = i < 2 ? -1 : (i + 1) * 100d / stages.Length;
+            var message = $"模拟安装：{stages[i]}";
             progress.Report(new InstallProgress(
-                stages[i], percent, 0, 0, 0, null, $"模拟安装：{stages[i]}"));
-            await Task.Delay(120, ct);
+                stages[i], percent, 0, 0, 0, null, message));
+            lock (_tasks)
+            {
+                var index = _tasks.FindIndex(t => t.TaskId == taskId);
+                if (index >= 0)
+                {
+                    _tasks[index] = _tasks[index] with
+                    {
+                        State = TaskState.Running,
+                        Percent = percent < 0 ? 0 : percent,
+                        Message = message,
+                    };
+                }
+            }
+
+            await Task.Delay(200, ct);
         }
 
         progress.Report(new InstallProgress(InstallStage.Done, 100, 0, 0, 0, null, "模拟安装完成"));
+        lock (_tasks)
+        {
+            var index = _tasks.FindIndex(t => t.TaskId == taskId);
+            if (index >= 0)
+            {
+                _tasks[index] = _tasks[index] with
+                {
+                    State = TaskState.Succeeded,
+                    Percent = 100,
+                    Message = "模拟安装完成",
+                };
+            }
+        }
+
         return FakeInstances[0];
     }
 
@@ -131,15 +220,57 @@ public sealed class FakeLauncherFacade : ILauncherFacade
 
     public Task SetActiveAccountAsync(string accountId, CancellationToken ct) => Task.CompletedTask;
 
+    private static readonly List<ModEntry> FakeMods =
+    [
+        new ModEntry("sodium", "Sodium", "0.6.0", "sodium.jar", true, LoaderKind.Fabric, [], null),
+        new ModEntry("iris", "Iris", "1.8.0", "iris.jar", true, LoaderKind.Fabric, ["sodium"], null),
+    ];
+
     public Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<ModEntry>>(
+        Task.FromResult<IReadOnlyList<ModEntry>>(FakeMods.ToArray());
+
+    public Task SetModEnabledAsync(string instanceId, string modId, bool enabled, CancellationToken ct)
+    {
+        var index = FakeMods.FindIndex(m => m.Id == modId);
+        if (index >= 0)
+        {
+            FakeMods[index] = FakeMods[index] with { Enabled = enabled };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteModAsync(string instanceId, string modId, CancellationToken ct)
+    {
+        FakeMods.RemoveAll(m => m.Id == modId);
+        return Task.CompletedTask;
+    }
+
+    public Task ImportModAsync(string instanceId, string sourceJarPath, CancellationToken ct)
+    {
+        var name = Path.GetFileNameWithoutExtension(sourceJarPath);
+        FakeMods.Add(new ModEntry(
+            name, name, null, Path.GetFileName(sourceJarPath), true, LoaderKind.Fabric, [], null));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<OnlineModSummary>> SearchOnlineModsAsync(
+        ModSource source, string query, string? modCategory, LoaderKind? loader, string? gameVersion, int page, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<OnlineModSummary>>(
         [
-            new ModEntry("sodium", "Sodium", "0.6.0", "sodium.jar", true, LoaderKind.Fabric, [], null),
-            new ModEntry("iris", "Iris", "1.8.0", "iris.jar", true, LoaderKind.Fabric, ["sodium"], null),
+            new OnlineModSummary("sodium", "sodium", "Sodium", "现代渲染优化，大幅提升帧率", "jellysquid3", 42000000, null),
+            new OnlineModSummary("iris", "iris", "Iris Shaders", "高性能光影加载器，兼容主流光影包", "coderbot", 18000000, null),
         ]);
 
-    public Task SetModEnabledAsync(string instanceId, string modId, bool enabled, CancellationToken ct) =>
-        Task.CompletedTask;
+    public Task<string> InstallOnlineModAsync(
+        string instanceId, ModSource source, string projectId, string? gameVersion, LoaderKind loader,
+        IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        var fileName = projectId + ".jar";
+        FakeMods.Add(new ModEntry(
+            projectId, projectId, null, fileName, true, loader, [], null));
+        return Task.FromResult(fileName);
+    }
 
     public Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct) =>
         Task.CompletedTask;
