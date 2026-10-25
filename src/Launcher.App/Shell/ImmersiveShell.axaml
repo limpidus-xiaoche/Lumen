@@ -60,6 +60,15 @@
             </Style>
           </ListBox.Styles>
         </ListBox>
+        <Button x:Name="ClassicButton"
+                Content="经典视图"
+                Click="OnClassicViewClick"
+                HorizontalAlignment="Left"
+                Padding="9,5"
+                FontSize="12"
+                CornerRadius="8"
+                Background="#2E1F55"
+                Foreground="#DCCFFF" />
       </StackPanel>
     </Border>
 

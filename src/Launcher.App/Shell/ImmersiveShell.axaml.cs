@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Launcher.App.ViewModels;
@@ -16,6 +17,12 @@ public partial class ImmersiveShell : UserControl
     private readonly DispatcherTimer _cameraTick;
     private readonly InputRouter _router = new();
     private Window? _window;
+
+    /// <summary>请求切换到经典视图，由宿主窗口决定窗口装饰与尺寸。</summary>
+    public event EventHandler? ClassicViewRequested;
+
+    private void OnClassicViewClick(object? sender, RoutedEventArgs e) =>
+        ClassicViewRequested?.Invoke(this, EventArgs.Empty);
 
     public ImmersiveShell()
     {
