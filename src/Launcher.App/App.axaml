@@ -84,5 +84,9 @@
 
   <Application.Styles>
     <FluentTheme />
+    <Style Selector="ProgressBar">
+      <Setter Property="Foreground" Value="#8B5CF6" />
+      <Setter Property="Background" Value="#2A1F45" />
+    </Style>
   </Application.Styles>
 </Application>

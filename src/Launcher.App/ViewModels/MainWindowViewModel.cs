@@ -9,7 +9,9 @@ public sealed record NavItem(string Title, object ViewModel);
 
 public partial class MainWindowViewModel : ObservableObject
 {
-    private readonly ILauncherFacade _facade;
+    /// <summary>沉浸式 Shell（S1）直接取门面读取实例列表。</summary>
+    public ILauncherFacade Facade { get; }
+
     private readonly InstancesViewModel _instances;
     private readonly LogsViewModel _logs;
     private readonly MoreViewModel _more;
@@ -29,7 +31,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel(ILauncherFacade facade)
     {
-        _facade = facade;
+        Facade = facade;
 
         Accounts = new AccountsViewModel(facade);
         _instances = new InstancesViewModel(facade);

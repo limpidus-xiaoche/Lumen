@@ -85,7 +85,7 @@
       <!-- 原版游戏 -->
       <StackPanel IsVisible="{Binding IsVanilla}" Spacing="10">
         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-          <TextBox Text="{Binding VanillaQuery}" Watermark="搜索版本号，如 1.20.1 或 26.3" FontSize="12" />
+          <TextBox Text="{Binding VanillaQuery}" PlaceholderText="搜索版本号，如 1.20.1 或 26.3" FontSize="12" />
           <ComboBox Grid.Column="1" ItemsSource="{Binding VersionFilters}"
                     SelectedItem="{Binding SelectedVersionFilter}" Width="96" FontSize="12" />
           <Button Grid.Column="2" Content="刷新清单" Command="{Binding LoadCommand}"
@@ -112,7 +112,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
           <TextBlock Text="实例名" FontSize="12" VerticalAlignment="Center"
                      Foreground="{DynamicResource TextMuted}" />
-          <TextBox Grid.Column="1" Text="{Binding InstanceName}" Watermark="留空则使用版本号" FontSize="12" />
+          <TextBox Grid.Column="1" Text="{Binding InstanceName}" PlaceholderText="留空则使用版本号" FontSize="12" />
           <Button Grid.Column="2" Content="安装原版" Command="{Binding InstallVanillaCommand}"
                   IsEnabled="{Binding !IsInstalling}"
                   Padding="16,7" CornerRadius="8" FontSize="12"
@@ -197,7 +197,7 @@
 
         <!-- 搜索行：关键字 + 渠道（Modrinth / CurseForge） -->
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBox Text="{Binding ModQuery}" Watermark="搜索模组名，如 sodium" Width="190" FontSize="13" />
+          <TextBox Text="{Binding ModQuery}" PlaceholderText="搜索模组名，如 sodium" Width="190" FontSize="13" />
           <ComboBox ItemsSource="{Binding ModSources}" SelectedItem="{Binding SelectedSourceName}"
                     Width="112" FontSize="12" />
           <Button Content="搜索" Command="{Binding SearchFirstCommand}"

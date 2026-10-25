@@ -1,4 +1,6 @@
 using Launcher.Core;
+using Launcher.Core.Accounts;
+using Launcher.Core.Auth;
 using Launcher.Core.Download;
 using Launcher.Core.Install;
 using Launcher.Core.Java;
@@ -36,14 +38,28 @@ public sealed class CoreServices
         var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
         var manifest = new ManifestClient(paths);
         var loaderMeta = new LoaderMetaClient(paths);
-        var resolver = new VersionResolver(manifest, loaderMeta);
+        var resolver = new VersionResolver(manifest, paths, loaderMeta);
         var javaLocator = new JavaLocator(paths);
+        var downloads = new DownloadEngine();
+        var loaderCatalog = new LoaderCatalog();
+        var loaderInstaller = new LoaderInstaller(
+            paths,
+            downloads,
+            resolver,
+            javaLocator,
+            settings,
+            loggerFactory.CreateLogger<LoaderInstaller>());
         var installer = new VanillaInstaller(
             paths,
             resolver,
-            new DownloadEngine(),
+            downloads,
             sqlite,
-            loggerFactory.CreateLogger<VanillaInstaller>());
+            loggerFactory.CreateLogger<VanillaInstaller>(),
+            loaderInstaller);
+        var accounts = new AccountStore(paths);
+        var microsoft = new MicrosoftAuth();
+        var authlib = new AuthlibAuth();
+        var authlibInjector = new AuthlibInjector(paths, downloads);
         var launcher = new LaunchService(
             paths,
             settings,
@@ -51,19 +67,26 @@ public sealed class CoreServices
             resolver,
             javaLocator,
             new RunningSessionStore(paths),
-            loggerFactory.CreateLogger<LaunchService>());
+            loggerFactory.CreateLogger<LaunchService>(),
+            accounts,
+            microsoft,
+            authlibInjector);
 
         var facade = new LauncherFacade(
             paths,
             settings,
             sqlite,
             loggerFactory.CreateLogger<LauncherFacade>(),
-            manifest,
-            javaLocator,
-            installer,
-            new TaskRegistry(sqlite),
-            launcher,
-            loaderMeta);
+            manifestClient: manifest,
+            javaLocator: javaLocator,
+            installer: installer,
+            tasks: new TaskRegistry(sqlite),
+            launcher: launcher,
+            accounts: accounts,
+            microsoft: microsoft,
+            authlib: authlib,
+            loaderCatalog: loaderCatalog,
+            loaderMeta: loaderMeta);
 
         return new CoreServices(paths, facade);
     }

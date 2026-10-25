@@ -19,29 +19,33 @@ public sealed class VanillaInstaller
         InstallStage.Libraries,
         InstallStage.Natives,
         InstallStage.Assets,
+        InstallStage.Loader,
         InstallStage.Finalizing,
     ];
 
-    private static readonly double[] StageWeights = [1, 2, 4, 15, 1, 20, 1];
+    private static readonly double[] StageWeights = [1, 5, 15, 1, 20, 25, 1];
 
     private readonly LauncherPaths _paths;
     private readonly VersionResolver _resolver;
     private readonly DownloadEngine _downloads;
     private readonly SqliteStore _sqlite;
     private readonly ILogger<VanillaInstaller> _logger;
+    private readonly LoaderInstaller? _loaderInstaller;
 
     public VanillaInstaller(
         LauncherPaths paths,
         VersionResolver resolver,
         DownloadEngine downloads,
         SqliteStore sqlite,
-        ILogger<VanillaInstaller> logger)
+        ILogger<VanillaInstaller> logger,
+        LoaderInstaller? loaderInstaller = null)
     {
         _paths = paths;
         _resolver = resolver;
         _downloads = downloads;
         _sqlite = sqlite;
         _logger = logger;
+        _loaderInstaller = loaderInstaller;
     }
 
     public async Task<InstanceSummary> InstallAsync(
@@ -125,6 +129,20 @@ public sealed class VanillaInstaller
             {
                 await InstallAssetsAsync(detail, progress, ct);
                 await JournalAsync(instanceId, InstallStage.Assets, "done", string.Empty, ct);
+            }
+
+            if (LoaderIds.IsLoader(request.Loader))
+            {
+                if (_loaderInstaller is null)
+                {
+                    throw new InstallException("E3001", "加载器安装器未注入。");
+                }
+
+                await JournalAsync(
+                    instanceId, InstallStage.Loader, "start", request.Loader.ToString(), ct);
+                Report(progress, InstallStage.Loader, 0, $"安装 {request.Loader}");
+                await _loaderInstaller.InstallAsync(request, progress, ct);
+                await JournalAsync(instanceId, InstallStage.Loader, "done", string.Empty, ct);
             }
 
             await JournalAsync(instanceId, InstallStage.Finalizing, "start", string.Empty, ct);
