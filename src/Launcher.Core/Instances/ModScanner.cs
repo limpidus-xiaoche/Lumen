@@ -32,8 +32,9 @@ public static partial class ModScanner
                 continue;
             }
 
-            var id = EnabledStem(name);
+            var stem = EnabledStem(name);
             var metadata = ReadMetadata(file);
+            var id = metadata.Id ?? stem;
             result.Add(new ModEntry(
                 id,
                 metadata.Name ?? id,
@@ -60,7 +61,8 @@ public static partial class ModScanner
         }
 
         var entry = Scan(gameDir, LoaderKind.Vanilla)
-            .FirstOrDefault(m => string.Equals(m.Id, modId, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(m => string.Equals(m.Id, modId, StringComparison.OrdinalIgnoreCase)
+                                 || string.Equals(EnabledStem(m.FileName), modId, StringComparison.OrdinalIgnoreCase));
         if (entry is null || entry.Enabled == enabled)
         {
             return entry is not null;
@@ -108,7 +110,7 @@ public static partial class ModScanner
             // 文件被占用等，回退文件名。
         }
 
-        return new ModMetadata(null, null, []);
+        return new ModMetadata(null, null, null, []);
     }
 
     private static ModMetadata ReadFabric(ZipArchiveEntry entry)
@@ -132,6 +134,7 @@ public static partial class ModScanner
         }
 
         return new ModMetadata(
+            id,
             name ?? id,
             version,
             dependencies.Where(d => !string.Equals(d, "minecraft", StringComparison.OrdinalIgnoreCase))
@@ -158,6 +161,7 @@ public static partial class ModScanner
         }
 
         return new ModMetadata(
+            modId,
             displayName ?? modId,
             version,
             Array.Empty<string>());
@@ -172,5 +176,6 @@ public static partial class ModScanner
     [GeneratedRegex("(?:^|\\n)\\s*version\\s*=\\s*\"([^\"]+)\"", RegexOptions.Multiline)]
     private static partial Regex VersionRegex();
 
-    private sealed record ModMetadata(string? Name, string? Version, IReadOnlyList<string> Dependencies);
+    private sealed record ModMetadata(
+        string? Id, string? Name, string? Version, IReadOnlyList<string> Dependencies);
 }

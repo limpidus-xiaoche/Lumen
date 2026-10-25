@@ -34,10 +34,9 @@ v1 仅支持 **Windows 10/11 x64**，许可证 **MIT**；不签名，只用 SHA-
 
 ## 最近进度
 
+- **2026-10-25 · 收尾修复**：接入 ClassicShell 切换（F2 / 左上角「经典视图」按钮）；Forge 模组按 `mods.toml` 的 `modId` 匹配启停并补测试；全量 142 项测试通过。
 - **2026-10-25 · 合并 origin/main（M1–M3 UI）**：沉浸式 S1 保持默认视图，经典 PCL 布局原样迁入 `Shell/ClassicShell`；门面合并账户/任务/在线模组能力，CLI 同时保留 `loaders` 与 `loader-versions`；模组读写统一走实例真实 gameDir。
 - **2026-10-25 · 仓库审议修复**：README 拆分当前状态与历史归档；technoledge/ui/第三方声明口径统一；新增 `docs-lint` + PR CI；补 `Launcher.Render.Tests`（19 项）；启动失败指引改为真实日志路径；格式门禁落地（133 项测试全通过）。
-- **2026-10-24 · 视觉整改 R2**：打通原版末地石/黑曜石贴图，修掉 4 个真 bug（`#all` 纹理引用、顶点色被 `mix` 丢弃、加色混合白斑、误取模组 jar），门框与岛体重排。
-- **2026-10-24 · S1 世界层骨架**：新增 `Launcher.Render`（`IGlApi` + 自有函数指针加载、相机/布局/渲染器）与 `WorldView` / `ImmersiveShell` / `CameraController` / `InputRouter`；实测 GLES 3.0 (ANGLE)，`LUMEN_DISABLE_GL=1` 降级横幅可用。
 
 ## 历史归档
 

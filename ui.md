@@ -59,6 +59,8 @@ void ExitFullScreen()
 
 由 `Shell/InputRouter` 统一维护栈，**任何控件不得自行处理 ESC**。
 
+> 经典视图切换：`F2` 或沉浸式左上角「经典视图」按钮；窗口装饰随之切换（沉浸 = `None` + FullScreen + 不可缩放，经典 = `BorderOnly` + 可缩放）。
+
 ### 1.3 焦点作用域（修正：消除 Space/Enter/Tab 歧义）
 
 | 作用域 | Tab | Enter | Space |

@@ -61,6 +61,38 @@ public sealed class ModScannerTests
         Assert.False(ModScanner.SetEnabled(gameDir, "missing", enabled: false));
     }
 
+    [Fact]
+    public void Forge_Mod_Uses_Metadata_Id()
+    {
+        var gameDir = TempDir();
+        var mods = Path.Combine(gameDir, "mods");
+        Directory.CreateDirectory(mods);
+        WriteForgeJar(Path.Combine(mods, "ForgeLib-1.0.jar"), "forge_lib", "Forge Lib", "1.2.3");
+
+        var entry = Assert.Single(ModScanner.Scan(gameDir, LoaderKind.Forge));
+
+        Assert.Equal("forge_lib", entry.Id);
+        Assert.Equal("Forge Lib", entry.Name);
+        Assert.Equal("1.2.3", entry.Version);
+    }
+
+    [Fact]
+    public void Toggle_Forge_Mod_Accepts_Metadata_Id_And_File_Stem()
+    {
+        var gameDir = TempDir();
+        var mods = Path.Combine(gameDir, "mods");
+        Directory.CreateDirectory(mods);
+        var jar = Path.Combine(mods, "ForgeLib-1.0.jar");
+        WriteForgeJar(jar, "forge_lib", "Forge Lib", "1.2.3");
+
+        Assert.True(ModScanner.SetEnabled(gameDir, "forge_lib", enabled: false));
+        Assert.True(File.Exists(jar + ".disabled"));
+
+        Assert.True(ModScanner.SetEnabled(gameDir, "ForgeLib-1.0", enabled: true));
+        Assert.True(File.Exists(jar));
+        Assert.False(File.Exists(jar + ".disabled"));
+    }
+
     private static void WriteFabricJar(string path, string id, string name, string version)
     {
         using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
@@ -69,6 +101,22 @@ public sealed class ModScannerTests
         writer.Write($$"""
             { "id": "{{id}}", "name": "{{name}}", "version": "{{version}}",
               "depends": { "minecraft": "1.21", "fabric-api": "*" } }
+            """);
+    }
+
+    private static void WriteForgeJar(string path, string modId, string name, string version)
+    {
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        var entry = archive.CreateEntry("META-INF/mods.toml");
+        using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
+        writer.Write($$"""
+            modLoader="javafml"
+            loaderVersion="[40,)"
+            license="MIT"
+            [[mods]]
+            modId="{{modId}}"
+            version="{{version}}"
+            displayName="{{name}}"
             """);
     }
 
