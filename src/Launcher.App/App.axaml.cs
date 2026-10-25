@@ -67,7 +67,7 @@ public partial class App : Application
         });
         panel.Children.Add(new TextBlock
         {
-            Text = "可执行 `lumen diagnostics` 导出诊断包；详细日志见 %LOCALAPPDATA%\\Lumen\\logs。",
+            Text = "详细日志位于 %LOCALAPPDATA%\\Lumen\\logs；反馈问题时请附上该目录下最新的 launcher-*.log。",
             Opacity = 0.75,
             TextWrapping = TextWrapping.Wrap,
         });

@@ -1,20 +1,20 @@
 # technoledge.md — 启动器项目技术与协作规范
 
-> 面向两名并行开发者。本文是**唯一事实来源**（single source of truth）：接口、目录归属、约定以本文为准；实现与本文冲突时，先改本文再改代码。
+> 面向单维护者（原 A/B 并行分工已取消，见 §4 末尾）。本文是**唯一事实来源**（single source of truth）：接口、目录归属、约定以本文为准；实现与本文冲突时，先改本文再改代码。
 
 | 项目代号 | **`Lumen`（已确认）** |
 |---|---|
-| 文档版本 | **v0.10** — M6（A）落地：实例删除/外部导入/模组启停；其余沿用 v0.9 |
-| 日期 | 2026-10-24 |
+| 文档版本 | **v0.11** — M8 与 S1 落地；文档口径统一（2026-10-25） |
+| 日期 | 2026-10-25 |
 | 目标平台 | **v1 = Windows 10/11 x64 only**；跨平台列入 v2 非目标 |
-| 开发者 | A：核心（Core / CLI / 打包）　B：应用（Avalonia UI / 交互 / 生态页面） |
+| 开发者 | 单维护者（原 A/B 分工已取消）；模块职责边界见 §4，唯一硬约束：Core 与 ILauncherFacade 契约不被 UI 反向改写 |
 | 参考实现 | PCL2（.NET 单文件 + JavaWrapper）、HMCL（Java 继承合并 + Java 约束）、VersePC（Electron + Node 后端 + 插件） |
 
 ---
 
 ## 0. 怎么用这份文档
 
-1. 开工前两人一起读完 §1–§6，确认接口契约（§5）。
+1. 开工前先读完 §1–§6，确认接口契约（§5）。
 2. 进度只在 **`README.md`** 维护（本文 §14 只放链接），避免两处漂移。
 3. 改动共享文件（§9.3 清单）必须先说一声。
 4. 接口要变 → 先提 PR 改本文和 `Launcher.Protocol`，再改实现。
@@ -49,7 +49,7 @@
 
 | 项 | 选型 | 修订说明 |
 |---|---|---|
-| 运行时 | **只钉一个 TFM**：优先 `net10.0-windows`；若两人环境不一致，统一降到 `net8.0-windows` | 「10 与 8 API 兼容」不成立；用 `global.json` 钉 SDK |
+| 运行时 | **只钉一个 TFM**：优先 `net10.0-windows`；若各环境 SDK 不一致，统一降到 `net8.0-windows` | 「10 与 8 API 兼容」不成立；用 `global.json` 钉 SDK |
 | UI | Avalonia 12.1.4 | Windows 优先；M0 实际使用版本 |
 | MVVM | CommunityToolkit.Mvvm | |
 | 日志 | `Microsoft.Extensions.Logging.Abstractions`（Core）+ **Serilog** 文件 sink（App） | Core 只依赖抽象；sink 选型统一 |
@@ -76,7 +76,7 @@ NuGet.config                     # 仓库内只保留 nuget.org；国内镜像�
 .gitignore
 ```
 
-### 环境检查（两人各跑一遍，结果贴群里）
+### 环境检查（首次搭建时跑一遍，结果记入 README）
 
 ```powershell
 dotnet --list-sdks        # 必须与 global.json 一致
@@ -116,50 +116,76 @@ git config --global core.autocrlf false   # 与 .gitattributes 配合，避免�
 ## 4. 解决方案结构与文件归属
 
 ```
-Launcher.sln
+Launcher.slnx
 Directory.Build.props / Directory.Packages.props / global.json
 .editorconfig / NuGet.config / .config/dotnet-tools.json
 .gitattributes / .gitignore
-technoledge.md（共享） / README.md（共享，进度唯一载体）
+technoledge.md（共享） / README.md（共享，进度唯一载体） / ui.md（UI 与设计约定）
 LICENSE（MIT，共享） / THIRD_PARTY_NOTICES.md（共享）
 
 src/
   Launcher.Protocol/             # 共享：仅 DTO/枚举/接口
-    Versions/*.cs  Instances/*.cs  Progress/*.cs  Accounts/*.cs
-    Mods/*.cs  Updates/*.cs  Logs/*.cs
-    Loaders/*.cs  Settings/*.cs  Tasks/*.cs
-  Launcher.Core/                 # 归属：A
-    Meta/        VersionManifest.cs VersionDetail.cs RuleEvaluator.cs VersionResolver.cs
-    Download/    DownloadItem.cs DownloadEngine.cs MirrorSelector.cs SpeedLimiter.cs
-                 ResumeMetadata.cs DownloadQueue.cs
-    Install/     IInstallStep.cs InstallJournal.cs VanillaInstaller.cs FabricInstaller.cs
-                 ForgeInstaller.cs NeoForgeInstaller.cs ModpackInstaller.cs RepairService.cs
-    Java/        JavaLocator.cs JavaRegistryScanner.cs JavaRuntime.cs JavaVersionPolicy.cs
-                 JreDownloader.cs
-    Launch/      ArgumentBuilder.cs LaunchService.cs ArgFileWriter.cs ProcessRunner.cs
-                 ExitCodeAnalyzer.cs
-    Auth/        OfflineAuth.cs MicrosoftAuth.cs AuthlibInjectorAuth.cs
-                 ICredentialProtector.cs DpapiCredentialProtector.cs TokenStore.cs
-    Instances/   InstanceManager.cs IsolationPolicy.cs ExternalScanner.cs NativesManager.cs
-    Storage/     LauncherPaths.cs AppSettings.cs SqliteStore.cs Migrations/*.cs AtomicFile.cs
-    Diagnostics/ CrashAnalyzer.cs DiagnosticBundle.cs LogRedactor.cs
-  Launcher.App/                  # 归属：B
-    App.axaml  Program.cs
-    Views/  ViewModels/  Services/  Assets/  Mock/FakeLauncherFacade.cs
-  Launcher.Cli/                  # 归属：A
-    Commands/ install.cs launch.cs java.cs diag.cs
+    Launcher.Protocol.csproj  ILauncherFacade.cs
+    Versions/VersionManifest.cs  Accounts/AccountModels.cs  Instances/InstanceModels.cs
+    Progress/ProgressModels.cs   Settings/SettingsModels.cs  Update/UpdateModels.cs
+    Misc/MiscModels.cs
+  Launcher.Core/                 # 内核：无 UI、无容器，可被 CLI/测试直接驱动
+    Launcher.Core.csproj  LauncherFacade.cs
+    Meta/        ManifestClient.cs VersionDetail.cs RuleEvaluator.cs VersionResolver.cs LoaderCatalog.cs
+    Download/    DownloadItem.cs DownloadEngine.cs UrlGuard.cs
+    Install/     VanillaInstaller.cs LoaderInstaller.cs ModpackInstaller.cs LoaderIds.cs
+                 AssetIndexJson.cs TaskRegistry.cs ThrottledProgress.cs InstallException.cs
+    Java/        JavaLocator.cs JavaVersionParser.cs
+    Launch/      ArgumentBuilder.cs ArgFileWriter.cs LaunchService.cs ExitCodeAnalyzer.cs
+                 JavaVersionPolicy.cs RunningSessionStore.cs LaunchException.cs
+    Auth/        OfflineAuth.cs MicrosoftAuth.cs AuthlibAuth.cs AuthlibInjector.cs
+                 CredentialProtector.cs AuthException.cs
+    Accounts/    AccountStore.cs
+    Instances/   ExternalImporter.cs ModScanner.cs
+    Game/        GameOptions.cs
+    Storage/     LauncherPaths.cs AppSettingsStore.cs SqliteStore.cs AtomicFile.cs PathGuard.cs
+    Update/      UpdateService.cs IntegrityService.cs IntegrityManifest.cs ReleaseManifest.cs
+                 UpdatePackageVerifier.cs IntegrityException.cs UpdateException.cs
+    Diagnostics/ DiagnosticsExporter.cs
+  Launcher.Render/               # 沉浸式世界渲染（OpenGL 抽象层）
+    Launcher.Render.csproj  SceneRenderer.cs PortalLayout.cs BlockModelLoader.cs MeshData.cs
+    Shaders.cs Camera.cs Math.cs Gl.cs IGlApi.cs
+  Launcher.App/                  # Avalonia UI / 交互
+    Launcher.App.csproj  App.axaml  App.axaml.cs  Program.cs
+    MainWindow.axaml  MainWindow.axaml.cs
+    Shell/       ImmersiveShell.axaml ImmersiveShell.axaml.cs CameraController.cs InputRouter.cs
+    Views/       HomeView.axaml HomeView.axaml.cs  DownloadView.axaml DownloadView.axaml.cs
+                 InstancesView.axaml InstancesView.axaml.cs  AccountsView.axaml AccountsView.axaml.cs
+                 LogsView.axaml LogsView.axaml.cs  SettingsView.axaml SettingsView.axaml.cs
+    ViewModels/  HomeViewModel.cs DownloadViewModel.cs InstancesViewModel.cs AccountsViewModel.cs
+                 LogsViewModel.cs SettingsViewModel.cs MainWindowViewModel.cs
+    Services/    CoreServices.cs
+    Mock/        FakeLauncherFacade.cs
+    World/       MinecraftAssetProvider.cs WorldView.cs
+  Launcher.Cli/                  # 命令行入口
+    Launcher.Cli.csproj  Program.cs
 
 tests/
-  Launcher.Core.Tests/           # 归属：A（唯一归属，B 不直接改；需要用例提 issue 或 PR 由 A 合）
-  Launcher.App.Tests/            # 归属：B
+  Launcher.Core.Tests/           # 19 个测试源文件（架构、规则、下载、安装、启动、账户、存储、M6/M8）
+    Launcher.Core.Tests.csproj
+    ArchitectureTests.cs AccountStoreTests.cs ArgFileWriterTests.cs ArgumentBuilderTests.cs
+    AuthTests.cs DownloadEngineTests.cs ExitCodeAnalyzerTests.cs GameOptionsTests.cs
+    JavaVersionParserTests.cs JavaVersionPolicyTests.cs LoaderTests.cs M6Tests.cs M8Tests.cs
+    ModpackInstallerTests.cs OfflineAuthTests.cs RuleEvaluatorTests.cs StorageTests.cs
+    UrlGuardTests.cs VersionResolverTests.cs
+  Launcher.App.Tests/
+    Launcher.App.Tests.csproj FakeLauncherFacadeTests.cs M1ViewModelTests.cs
   Launcher.Integration.Tests/
-    Core/*.cs                    # 归属：A
-    App/*.cs                     # 归属：B
+    Launcher.Integration.Tests.csproj PathLayoutTests.cs
+  Launcher.Render.Tests/
+    Launcher.Render.Tests.csproj PortalLayoutTests.cs CameraTests.cs RenderArchitectureTests.cs
 ```
 
-### 共享文件（改动前必须在群里说，PR 需对方 review）
+> 目录清单与 `git ls-files` 对齐；**新增 `.cs` 不需要改本清单**，但改动共享目录结构时需同步本节。
 
-`Directory.Packages.props`、`Launcher.sln`、`Launcher.Protocol/**`、`README.md`、`technoledge.md`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`.github/**`、`build/**`。
+### 共享文件（改动前先记录意图，PR 需说明影响面）
+
+`Directory.Packages.props`、`Launcher.slnx`、`Launcher.Protocol/**`、`README.md`、`technoledge.md`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`.github/**`、`build/**`。
 
 > SDK 风格 csproj 自动包含 `.cs`，**新增文件不需要改 csproj**；只有新增 NuGet 包才动 `Directory.Packages.props`。
 
@@ -358,8 +384,8 @@ public enum DownloadSourceMode { Auto, Official, Mirror }
 ### 契约变更流程
 
 1. 提 PR 改 `Launcher.Protocol` + 本文 §5（表格登记版本与变更点）。
-2. 对方 review 通过后合并。
-3. A 更新实现，B 更新 Mock 与 VM，各自一个 PR。
+2. 自查通过后合并（Core 实现与 App 的 Mock/VM 必须在同一变更周期内同步）。
+3. 契约只由 Core 提出，App 只能提需求，不得反向改写（§4 末尾硬约束）。
 
 | 契约版本 | 日期 | 变更 | 提出人 |
 |---|---|---|---|
@@ -467,7 +493,7 @@ public enum DownloadSourceMode { Auto, Official, Mirror }
 | Vanilla | client jar → libraries → natives → assets | ≤1.6 资源走 `virtual/legacy` |
 | Fabric | `loader/{game}/{loader}/profile/json` → 规范化 libraries 的 `downloads.artifact` → 子版本 JSON + 依赖库 | **v1 只验收 Fabric**；Quilt 保留实现位、不进 v1 验收。profile 的 `releaseTime` 可能为空串，反序列化按 null 处理 |
 | Forge（全版本） | **官方 installer `--installClient <shared>`**：先装 vanilla，再运行 installer；installer 自己处理 processors / bootstraplauncher / legacy universal | 目标目录**必须有 `launcher_profiles.json`**（缺失时自动写入最小文件）；允许 15 分钟超时；失败 `E3001` 并带安装器日志尾部 |
-| Forge ≤1.12.2 | 同上（installer `--installClient`） | **已放弃 `com.bangbang93.ForgeInstaller`**，避开未核实许可证；1.12.2 代码路径未真机验证（本机无 Java 8） |
+| Forge ≤1.12.2 | 同上（installer `--installClient`） | **早期第三方 Forge 安装器方案已撤销**（许可证未核实）；1.12.2 代码路径未真机验证（本机无 Java 8） |
 | NeoForge | 与 Forge 同一 installer 路径，版本号规则不同（1.20.2+） | 安装器与元数据均在 `maven.neoforged.net`；本机 DNS 被污染不可达，代码路径已实现但未真机验收 |
 | 加载器子版本 ID | `fabric-loader-{loader}-{game}` / `{game}-forge-{loader}` / `{game}-neoforge-{loader}` | 安装与启动共用 `LoaderIds`；installer 生成的非规范 ID 自动重命名归一 |
 | 整合包 | CurseForge `manifest.json`；Modrinth `modrinth.index.json`；HMCL `modpack.json`；MultiMC `mmc-pack.json` + `instance.cfg` | 文件名写死，禁止各方猜；**只补清单声明的依赖**，`mods.toml` 运行时依赖无法推导，M7 验收不要求 |
@@ -755,7 +781,7 @@ docs: 契约 v0.5
 
 ### 9.3 冲突预防
 
-1. **目录归属唯一**：A 只动 `Core/`、`Cli/`、`Core.Tests/`、`Integration.Tests/Core/`；B 只动 `App/`、`App.Tests/`、`Integration.Tests/App/`。
+1. **目录职责边界清晰**：`Core/`、`Cli/`、`Core.Tests/`、`Integration.Tests/` 与 `App/`、`App.Tests/`、`Protocol/`、`Render/` 按模块分组，跨模块改动视为契约变更（§5）。
 2. 共享文件改前打招呼（§4 清单）。
 3. DTO 一个 record 一个文件，减少同文件冲突。
 4. 每天开工 `git pull --rebase`；收工前推 WIP 分支（标题 `[WIP]`）。
@@ -773,7 +799,7 @@ docs: 契约 v0.5
 
 ## 10. 任务拆解与里程碑（v0.5 修订）
 
-> 无时间估算，只排顺序与验收。`[A]`=核心，`[B]`=应用，`[AB]`=共同。
+> 无时间估算，只排顺序与验收。`[A]`=核心，`[B]`=应用，`[AB]`=共同——这些标签是 M0–M8 历史记录沿用，**不再表示现行分工**（分工已取消，见 §4 末尾）。
 
 ### M0 骨架 + 离线身份（修订：离线认证前移）——✅ 2026-10-24 完成
 
@@ -946,15 +972,15 @@ docs: 契约 v0.5
 | 4 | 分发 | Velopack only | 与 MSI 并行会互相覆盖 |
 | 5 | 代码签名 | **v1 不签名**（Authenticode 与应用层签名都不做） | 决策已定；靠 HTTPS + SHA-256；v2 可加签名 |
 | 6 | 命令行超长 | Java 9+ argfile，Java 8 wrapper | argfile 等首行输出后删，需重试 |
-| 7 | Forge 安装 | ≤1.12.2 用 bangbang93（许可证为门禁）；1.13+ 走官方 installer | 1.13–1.16.5 用 install_profile + processors |
+| 7 | Forge 安装 | 早期第三方 Forge 安装器方案已撤销，统一见 #15 | 官方 installer 覆盖全部 Forge 版本 |
 | 8 | 第三方合规 | 运行期下载 + SHA1 + 声明 | authlib-injector 不打包 |
 | 9 | 路径 | 构建目录必须 ASCII | 当前 `D:\启动器` 含非 ASCII |
 | 10 | 命名 | 代号 `Lumen`，发布前商标检索 | 避开 VersePC 前缀 |
 | 11 | 杀软误报 | 未签名 + 首次启动引导 + 安装器分发 | 不预留证书预算；靠口碑与帮助文档降低流失 |
 | 12 | 完整性 | SHA-256 清单 + fail-closed；残余风险：发布渠道被攻破 | 安全边界见 §12.1 |
-| 13 | 仓库 | GitHub 私有（Free 计划），SSH 公钥；保护降级为约定 + pre-push hook | 两人各持自己的公钥，仓库零密钥 |
+| 13 | 仓库 | GitHub 私有（Free 计划），SSH 公钥；保护降级为约定 + pre-push hook | 维护者持自己的公钥，仓库零密钥 |
 | 14 | 许可证 | 本项目 **MIT**；第三方不兼容则只运行期下载 | 需 `LICENSE` 与 `THIRD_PARTY_NOTICES.md` |
-| 15 | Forge ≤1.12.2 | **改用官方 installer `--installClient`**（与 1.13+ 同一路径）；不再引入 `com.bangbang93.ForgeInstaller` | 官方 installer 对所有 Forge 版本均支持 headless；1.20.1 已真机验证，1.12.2 需 Java 8 环境补测 |
+| 15 | Forge ≤1.12.2 | **改用官方 installer `--installClient`**（与 1.13+ 同一路径）；不再引入第三方 Forge 安装器 | 官方 installer 对所有 Forge 版本均支持 headless；1.20.1 已真机验证，1.12.2 需 Java 8 环境补测 |
 | 16 | CurseForge | **已定 C**：Modrinth/HMCL/MultiMC；CF 仅直链包 | M7 不验收 CF API 路线 |
 | 17 | GitHub 计划 | **Free**：分支保护不可用 → 约定 + pre-push hook + CI | CODEOWNERS 仅作 review 路由 |
 | 18 | 是否 fork PCL2 | **不 fork，也不复制其代码/资源** | 许可证为《PCL 分发有限许可》+ 合理使用指南；重度使用要求「PCL 开头命名 + 关于页署名 + 公开源码并沿用指南 + 正版/赞助劝导 + Windows 主色相蓝色」，与 MIT/Lumen 直接冲突 |
@@ -973,16 +999,17 @@ docs: 契约 v0.5
 每日提交者在 README 末尾追加：
 
 ```
-[YYYY-MM-DD] A: 完成 xxx / 阻塞: xxx；B: 完成 xxx
+[YYYY-MM-DD] 完成 xxx / 阻塞: xxx
 ```
 
-同步会三问：昨天完成什么 / 今天做什么 / 有没有阻塞契约。
+同步三问：昨天完成什么 / 今天做什么 / 有没有阻塞契约。
 
 ---
 
 ## 15. 上手 Checklist（v0.4 修正）
 
 ```powershell
+$env:AVALONIA_TELEMETRY_OPTOUT='1'   # 受限环境/沙箱/CI 必须设置，否则 Avalonia 遥测写盘失败会导致构建报 MSB4018
 git clone git@github.com:limpidus-xiaoche/Lumen.git ; cd Lumen   # SSH 公钥认证；路径必须 ASCII
 dotnet restore
 dotnet build -warnaserror
@@ -996,7 +1023,9 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla
 dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name Dev  # 临时离线账户
 ```
 
-第一天完成：1–4 全绿；B 能用 `FakeLauncherFacade` 看到假进度与不确定进度条。
+> 第一行的 `AVALONIA_TELEMETRY_OPTOUT=1` 必须保留：受限环境/沙箱/CI 未设置时，Avalonia 遥测写盘失败会让首次 `dotnet build` 报 **MSB4018**。
+
+第一天完成：1–4 全绿；能用 `FakeLauncherFacade` 看到假进度与不确定进度条。
 
 ---
 
@@ -1016,7 +1045,7 @@ dotnet run --project src/Launcher.Cli -- launch sandbox-vanilla --offline-name D
 
 ---
 
-## 17. 评审响应表（v0.4）
+## 17. 评审响应表
 
 | 评审项 | 处理位置 |
 |---|---|

@@ -44,7 +44,10 @@ public struct Mat4
 
     public static Mat4 Identity => new()
     {
-        M11 = 1, M22 = 1, M33 = 1, M44 = 1,
+        M11 = 1,
+        M22 = 1,
+        M33 = 1,
+        M44 = 1,
     };
 
     public static Mat4 Perspective(float fovYDegrees, float aspect, float near, float far)

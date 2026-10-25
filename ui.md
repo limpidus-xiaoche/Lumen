@@ -492,10 +492,12 @@ public string     WindowPlacement { get; init; } = "";
 | 规则 | 参数 |
 |---|---|
 | 主门 | `(0,0,0)` 正对镜头 |
-| 其余门 | 弧线间隔 22°，半径 2.2 m，z 递减 0.35 m |
-| 缩放 | `0.75^(index/2)` |
-| 不透明度 | `clamp(0.9 - 0.10*index, 0.35, 0.9)` |
+| 其余门 | 弧线间隔 30°（`ArcStepRadians`），半径 3.2 m（`ArcRadius`），z 递减 0.55 m（`DepthStep`） |
+| 缩放 | `0.80^(|k|/2)`，`k` 为左右交替的带符号位次 |
+| 不透明度 | `clamp(0.9 - 0.10*|k|, 0.35, 0.9)` |
 | 折叠 | > 7 扇时第 7 位为「更多」 |
+
+> 左右位次使用 `(i+1)/2`，实测存在 0.5 的左右偏移（第 2/3 扇不对称），已记录为 S2 前待修缺陷。
 
 ### 8.2 门结构
 
@@ -518,15 +520,17 @@ public string     WindowPlacement { get; init; } = "";
 
 ### 9.1 预算
 
-| 指标 | 目标 |
-|---|---|
-| 冷启动到世界层首帧 | ≤ 1.5s |
-| 交互中帧率 | 60fps，1% low ≥ 50 |
-| 空闲帧率 | 上限 30fps（无输入 5s 后） |
-| 空闲 CPU | < 5% |
-| UI 空闲内存 | < 150MB（technoledge §6.10） |
-| 包体 | Portable.zip ≤ 96MB；publish 增量 ≤ +35MB |
-| 显存 | 不设指标，仅记录 GPU 名称 |
+| 指标 | 目标 | 当前实测 | 是否达标 |
+|---|---|---|---|
+| 冷启动到世界层首帧 | ≤ 1.5s | 5.2–8.1s（开发态 / ANGLE / 未 R2R / 沙箱内） | ❌ 未达标 |
+| 交互中帧率 | 60fps，1% low ≥ 50 | 未测（帧时间采样要求窗口聚焦且样本 ≥ 120 帧） | — 未测 |
+| 空闲帧率 | 上限 30fps（无输入 5s 后） | 未测 | — 未测 |
+| 空闲 CPU | < 5% | 未测 | — 未测 |
+| UI 空闲内存 | < 150MB（technoledge §6.10） | 未测 | — 未测 |
+| 包体 | Portable.zip ≤ 96MB；publish 增量 ≤ +35MB | Portable.zip 60.9MB（60,918,322 B）；Setup.exe 68.4MB（68,433,392 B）；publish 242 文件 | ✅ Portable.zip 达标；publish 增量未测 |
+| 显存 | 不设指标，仅记录 GPU 名称 | Intel Arc 140T（ANGLE 2.1.1，OpenGL ES 3.0） | — 无指标 |
+
+> 首帧实测口径：开发态直接运行（非 R2R publish、无预热缓存），且运行于沙箱内。R2R publish + 冷/热缓存条件下的复测**仍待执行**，达标结论未成立。
 
 ### 9.2 降级矩阵（全部真实 API）
 
@@ -545,21 +549,25 @@ public string     WindowPlacement { get; init; } = "";
 ## 10. 目录与依赖
 
 ```
-src/Launcher.Render/        # 不引用 Avalonia，依赖 IGlApi（§3.6）
-├─ Gl/ Scene/ Pick/ Post/
-src/Launcher.App/
-├─ Shell/ World/ Panels/ Audio/
-tools/audio/
+src/Launcher.Render/        # 不引用 Avalonia，依赖 IGlApi（§3.6）；当前为扁平文件，无子目录
+├─ IGlApi.cs  Gl.cs  Camera.cs  Math.cs
+├─ MeshData.cs  PortalLayout.cs  SceneRenderer.cs
+├─ Shaders.cs  BlockModelLoader.cs
+└─ Launcher.Render.csproj
+src/Launcher.App/           # 根目录另有 Program.cs / App.axaml(.cs)
+├─ Shell/  World/  Views/  ViewModels/  Services/  Mock/
+└─ Launcher.App.csproj
+tools/audio/                # 计划（S5），尚未创建
 ```
 
-| 包 | 版本 | 用途 |
-|---|---|---|
-| `SharpGLTF.Core` | 1.0.5 | GLB 解析（S1 暂不引 `.Toolkit`） |
-| `NAudio` + `NAudio.Wasapi` | 3.0.1 | `WasapiOut` |
-| `NAudio.Vorbis` | 3.0.0 | Ogg 解码 |
-| `StbImageSharp` | — | 贴图解码 |
+| 包 | 版本 | 用途 | 状态 |
+|---|---|---|---|
+| `StbImageSharp` | 2.27.11 | 贴图解码 | 已引入（App + Render） |
+| `SharpGLTF.Core` | 1.0.5 | GLB 解析（S1 暂不引 `.Toolkit`） | 计划（S4/S5，未引入） |
+| `NAudio` + `NAudio.Wasapi` | 3.0.1 | `WasapiOut` | 计划（S4/S5，未引入） |
+| `NAudio.Vorbis` | 3.0.0 | Ogg 解码 | 计划（S4/S5，未引入） |
 
-全部进 `Directory.Packages.props`，并登记 `THIRD_PARTY_NOTICES.md`。不引入 `Silk.NET.OpenGL`。
+其余已引入包以 `Directory.Packages.props` 为准，并登记 `THIRD_PARTY_NOTICES.md`。新增包统一进 `Directory.Packages.props`；不引入 `Silk.NET.OpenGL`。
 
 ---
 
@@ -604,6 +612,7 @@ tools/audio/
 2. 「更多」展开为弧形还是平面列表？
 3. 经典模式是否首启默认？
 4. 是否需要 4:3 / 9:16 安全区？
+   **结论（2026-10-25）**：4:3 安全区按 S4 任务 7 要求保留；9:16 竖版在 S6 单独裁剪，不进入 v1 验收。
 
 ---
 
@@ -624,11 +633,11 @@ tools/audio/
 
 ## 16. 文档同步待办
 
-| 项 | 位置 | 动作 |
-|---|---|---|
-| 拼写错误 `technoledg.md` | 本文 v1.0/v1.1 遗留 | 已全部改为 `technoledge.md` |
-| A/B 分工条款失效 | `technoledge.md` §14 协作约定 | 需标注"已由 ui.md 取代：不分工" |
-| `EnableEnhanced3D` 注释提"B 层" | 本文 | 已改为"增强 3D" |
-| `E9001` 未进错误码表 | 本文 | 已删除该错误码，UI 只写日志 |
-| `AccentColor` 与紫色令牌双源 | §2.1 | 已统一为单一来源 |
-| `AvaloniaUseCompiledBindingsByDefault=false` | [Launcher.App.csproj](file:///D:/启动器/src/Launcher.App/Launcher.App.csproj#L7) | S4 任务 8 改为 `true` |
+| 项 | 位置 | 动作 | 状态 |
+|---|---|---|---|
+| 拼写错误 `technoledg.md` | 本文 v1.0/v1.1 遗留 | 已全部改为 `technoledge.md` | 已完成（2026-10-25） |
+| A/B 分工条款失效 | `technoledge.md` §14 协作约定 | `technoledge.md` §14 末尾已注明「分工取消」，由本文 §11 取代 | 已完成（2026-10-25） |
+| `EnableEnhanced3D` 注释提"B 层" | 本文 | 已改为"增强 3D" | 已完成（2026-10-25） |
+| `E9001` 未进错误码表 | 本文 | 已删除该错误码，UI 只写日志 | 已完成（2026-10-25） |
+| `AccentColor` 与紫色令牌双源 | §2.1 | 已统一为单一来源 | 已完成（2026-10-25） |
+| `AvaloniaUseCompiledBindingsByDefault=false` | [Launcher.App.csproj](file:///D:/启动器/src/Launcher.App/Launcher.App.csproj#L7) | S4 任务 8 改为 `true` | 待办（当前仍为 `false`） |

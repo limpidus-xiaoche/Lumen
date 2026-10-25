@@ -10,5 +10,6 @@
     <Project Path="tests/Launcher.App.Tests/Launcher.App.Tests.csproj" />
     <Project Path="tests/Launcher.Core.Tests/Launcher.Core.Tests.csproj" />
     <Project Path="tests/Launcher.Integration.Tests/Launcher.Integration.Tests.csproj" />
+    <Project Path="tests/Launcher.Render.Tests/Launcher.Render.Tests.csproj" />
   </Folder>
 </Solution>

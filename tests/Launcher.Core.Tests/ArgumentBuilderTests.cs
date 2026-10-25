@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Launcher.Core.Launch;
 using Launcher.Core.Meta;
 using Xunit;
