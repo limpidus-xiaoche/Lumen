@@ -349,15 +349,15 @@
       </Border>
 
       <!-- 状态 + 大启动按钮 -->
-      <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="14">
-        <TextBlock Grid.Column="0" Text="{Binding StatusText}"
+      <StackPanel Grid.Row="2" Spacing="8" HorizontalAlignment="Right">
+        <TextBlock Text="{Binding StatusText}"
                    FontSize="12" Foreground="{DynamicResource TextSecondary}"
-                   VerticalAlignment="Center"
+                   HorizontalAlignment="Right"
                    TextTrimming="CharacterEllipsis" />
-        <Button Grid.Column="1" x:Name="LaunchButton" Classes="launch"
+        <Button x:Name="LaunchButton" Classes="launch"
                 Command="{Binding ToggleLaunchCommand}"
                 Content="{Binding LaunchButtonText}" />
-      </Grid>
+      </StackPanel>
     </Grid>
   </Grid>
 </UserControl>

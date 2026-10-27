@@ -165,8 +165,8 @@ public class SkinPreview : Control
             return;
         }
 
-        var scale = Math.Min(Bounds.Width / 42.0, Bounds.Height / 46.0) * 1.25 * _zoom;
-        var center = new Point(Bounds.Width / 2, Bounds.Height * 0.57);
+        var scale = Math.Min(Bounds.Width / 42.0, Bounds.Height / 46.0) * 1.2 * _zoom;
+        var center = new Point(Bounds.Width / 2, Bounds.Height / 2 + 16 * scale);
 
         var renders = new List<RenderFace>();
         foreach (var part in _parts)
