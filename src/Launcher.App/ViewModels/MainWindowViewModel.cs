@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Launcher.App.Services;
+using Launcher.App.Views;
 using Launcher.Protocol;
 
 namespace Launcher.App.ViewModels;
 
-public sealed record NavItem(string Title, object ViewModel);
+public sealed record NavItem(string Title, object ViewModel, IconKind Icon);
 
 public partial class MainWindowViewModel : ObservableObject
 {
@@ -29,25 +31,27 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private object? currentPage;
 
-    public MainWindowViewModel(ILauncherFacade facade)
+    public MainWindowViewModel(ILauncherFacade facade, string logsDir)
     {
         Facade = facade;
 
+        var runLog = new RunLogStore();
+
         Accounts = new AccountsViewModel(facade);
-        _instances = new InstancesViewModel(facade);
-        _logs = new LogsViewModel(facade);
+        _instances = new InstancesViewModel(facade, ShowSubPage, ShowHome);
+        _logs = new LogsViewModel(facade, logsDir, runLog);
         _more = new MoreViewModel(facade);
         _taskCenter = new TaskCenterViewModel(facade);
 
-        var home = new HomeViewModel(facade, ShowSubPage, ShowHome);
+        var home = new HomeViewModel(facade, _logs, runLog, _instances, logsDir, ShowSubPage, ShowHome);
         var download = new DownloadViewModel(facade);
         var settings = new SettingsViewModel(facade, _instances, _logs, ShowSubPage);
 
         Pages =
         [
-            new NavItem("启动", home),
-            new NavItem("下载", download),
-            new NavItem("设置", settings),
+            new NavItem("启动", home, IconKind.Enderman),
+            new NavItem("下载", download, IconKind.Shulker),
+            new NavItem("设置", settings, IconKind.EndRod),
         ];
 
         SelectedPage = Pages[0];

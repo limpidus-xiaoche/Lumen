@@ -78,11 +78,16 @@
             chrome:WindowDecorationProperties.ElementRole="TitleBar">
       <DockPanel LastChildFill="False">
 
-        <!-- 左侧：作者标识（简洁两行：品牌 + 定位） -->
-        <StackPanel DockPanel.Dock="Left" Margin="16,0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Border Width="14" Height="14" CornerRadius="3" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-          <StackPanel VerticalAlignment="Center" Spacing="-2">
-            <TextBlock Text="麦谷Limpidus" FontSize="16" FontWeight="Bold"
+        <!-- 左侧：方形皮肤头像 + 品牌（未登录显示默认皮肤） -->
+        <StackPanel DockPanel.Dock="Left" Margin="14,0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+          <Border Width="32" Height="32" CornerRadius="5" ClipToBounds="True"
+                  Background="#241634" BorderBrush="#59C9A7FF" BorderThickness="1">
+            <Image Source="{Binding Accounts.Avatar}"
+                   RenderOptions.BitmapInterpolationMode="None"
+                   Stretch="UniformToFill" />
+          </Border>
+          <StackPanel VerticalAlignment="Center" Spacing="0">
+            <TextBlock Text="LMD Launcher" FontSize="16" FontWeight="Bold"
                        Foreground="{DynamicResource AccentGlow}" />
             <TextBlock Text="启动器" FontSize="11" FontWeight="Medium"
                        Foreground="{DynamicResource TextSecondary}" />
@@ -196,7 +201,7 @@
               </Button.Styles>
             </Button>
 
-            <TextBlock Text="Lumen 0.1 · M2"
+            <TextBlock Text="Lumen 0.1 · M3"
                        Margin="26,0,0,0"
                        FontSize="11"
                        Opacity="0.45"

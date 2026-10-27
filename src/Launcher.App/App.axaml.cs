@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Launcher.App.Mock;
 using Launcher.App.Services;
 using Launcher.App.ViewModels;
+using Launcher.Core.Storage;
 using Launcher.Protocol;
 using Serilog;
 
@@ -26,9 +27,22 @@ public partial class App : Application
             var useFake = desktop.Args?.Contains("--fake", StringComparer.OrdinalIgnoreCase) == true
                           || Environment.GetEnvironmentVariable("LUMEN_FAKE") == "1";
             ILauncherFacade facade;
+            var fallbackPaths = LauncherPaths.CreateDefault(
+                LauncherPaths.IsPortableRequested(Environment.GetCommandLineArgs()));
+            var logsDir = fallbackPaths.LogsDir;
+
             try
             {
-                facade = useFake ? new FakeLauncherFacade() : CoreServices.Create().Facade;
+                if (useFake)
+                {
+                    facade = new FakeLauncherFacade();
+                }
+                else
+                {
+                    var services = CoreServices.Create();
+                    facade = services.Facade;
+                    logsDir = services.Paths.LogsDir;
+                }
             }
             catch (Exception ex)
             {
@@ -41,7 +55,7 @@ public partial class App : Application
 
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(facade),
+                DataContext = new MainWindowViewModel(facade, logsDir),
             };
         }
 

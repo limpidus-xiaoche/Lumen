@@ -39,51 +39,75 @@
     <ResourceDictionary>
       <ResourceDictionary.ThemeDictionaries>
 
-        <!-- 深色主题（默认）：低饱和深灰蓝 + 克制的科技蓝点缀 -->
+        <!-- 深色主题（默认）：末影暗黑 —— 炭黑底 + 暗紫主题色 -->
         <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="SidebarBackground" Color="#12141A" />
-          <SolidColorBrush x:Key="WindowBackground" Color="#0F1116" />
-          <SolidColorBrush x:Key="ContentBackground" Color="#14171E" />
-          <SolidColorBrush x:Key="CardBackground" Color="#181C24" />
-          <SolidColorBrush x:Key="HoverBrush" Color="#1A2029" />
-          <SolidColorBrush x:Key="BorderBrush" Color="#232936" />
-          <SolidColorBrush x:Key="TextPrimary" Color="#E8EAED" />
-          <SolidColorBrush x:Key="TextSecondary" Color="#A0A8B0" />
-          <SolidColorBrush x:Key="TextMuted" Color="#6E7782" />
-          <SolidColorBrush x:Key="AccentBrush" Color="#2BD4C4" />
-          <SolidColorBrush x:Key="AccentSoft" Color="#1A4A42" />
-          <SolidColorBrush x:Key="AccentGlow" Color="#57E5D5" />
-          <!-- 列表选中态统一走青色，覆盖 FluentTheme 默认蓝色 -->
-          <SolidColorBrush x:Key="ListBoxItemBackgroundSelected" Color="#332BD4C4" />
-          <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPointerOver" Color="#402BD4C4" />
-          <SolidColorBrush x:Key="ListBoxItemForegroundSelected" Color="#57E5D5" />
+          <SolidColorBrush x:Key="SidebarBackground" Color="#120E18" />
+          <SolidColorBrush x:Key="WindowBackground" Color="#0D0A12" />
+          <SolidColorBrush x:Key="ContentBackground" Color="#15101D" />
+          <SolidColorBrush x:Key="CardBackground" Color="#1B1426" />
+          <SolidColorBrush x:Key="HoverBrush" Color="#241A33" />
+          <SolidColorBrush x:Key="BorderBrush" Color="#33264A" />
+          <SolidColorBrush x:Key="TextPrimary" Color="#F0ECF7" />
+          <SolidColorBrush x:Key="TextSecondary" Color="#B4A9C7" />
+          <SolidColorBrush x:Key="TextMuted" Color="#7C7190" />
+          <SolidColorBrush x:Key="AccentBrush" Color="#A275F5" />
+          <SolidColorBrush x:Key="AccentSoft" Color="#2E1F4D" />
+          <SolidColorBrush x:Key="AccentGlow" Color="#C9A7FF" />
+          <!-- 毛玻璃卡片：半透明紫黑 + 淡紫描边 -->
+          <SolidColorBrush x:Key="GlassBackground" Color="#9E1C1428" />
+          <SolidColorBrush x:Key="GlassBorder" Color="#3DA275F5" />
+          <SolidColorBrush x:Key="GlassShadow" Color="#99000000" />
+          <!-- 列表选中态统一走暗紫，覆盖 FluentTheme 默认蓝色 -->
+          <SolidColorBrush x:Key="ListBoxItemBackgroundSelected" Color="#33A275F5" />
+          <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPointerOver" Color="#40A275F5" />
+          <SolidColorBrush x:Key="ListBoxItemForegroundSelected" Color="#C9A7FF" />
         </ResourceDictionary>
 
-        <!-- 浅色主题：干净白灰 + 同系青 -->
+        <!-- 浅色主题：干净白灰 + 同系紫 -->
         <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="SidebarBackground" Color="#EFF2F6" />
-          <SolidColorBrush x:Key="WindowBackground" Color="#F5F7FA" />
-          <SolidColorBrush x:Key="ContentBackground" Color="#FAFBFC" />
+          <SolidColorBrush x:Key="SidebarBackground" Color="#F1EEF6" />
+          <SolidColorBrush x:Key="WindowBackground" Color="#F7F4FB" />
+          <SolidColorBrush x:Key="ContentBackground" Color="#FCFAFF" />
           <SolidColorBrush x:Key="CardBackground" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="HoverBrush" Color="#E7EBF0" />
-          <SolidColorBrush x:Key="BorderBrush" Color="#DDE2E8" />
-          <SolidColorBrush x:Key="TextPrimary" Color="#1B2230" />
-          <SolidColorBrush x:Key="TextSecondary" Color="#5C6570" />
-          <SolidColorBrush x:Key="TextMuted" Color="#8B93A0" />
-          <SolidColorBrush x:Key="AccentBrush" Color="#0E9C8F" />
-          <SolidColorBrush x:Key="AccentSoft" Color="#D8F0EB" />
-          <SolidColorBrush x:Key="AccentGlow" Color="#12ADA0" />
-          <SolidColorBrush x:Key="ListBoxItemBackgroundSelected" Color="#332BD4C4" />
-          <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPointerOver" Color="#402BD4C4" />
-          <SolidColorBrush x:Key="ListBoxItemForegroundSelected" Color="#0E9C8F" />
+          <SolidColorBrush x:Key="HoverBrush" Color="#ECE6F5" />
+          <SolidColorBrush x:Key="BorderBrush" Color="#DFD6EC" />
+          <SolidColorBrush x:Key="TextPrimary" Color="#221A30" />
+          <SolidColorBrush x:Key="TextSecondary" Color="#5E5470" />
+          <SolidColorBrush x:Key="TextMuted" Color="#8C829E" />
+          <SolidColorBrush x:Key="AccentBrush" Color="#7A4DE0" />
+          <SolidColorBrush x:Key="AccentSoft" Color="#E9DFFF" />
+          <SolidColorBrush x:Key="AccentGlow" Color="#8B5CF6" />
+          <SolidColorBrush x:Key="GlassBackground" Color="#CCFFFFFF" />
+          <SolidColorBrush x:Key="GlassBorder" Color="#407A4DE0" />
+          <SolidColorBrush x:Key="GlassShadow" Color="#22000000" />
+          <SolidColorBrush x:Key="ListBoxItemBackgroundSelected" Color="#337A4DE0" />
+          <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPointerOver" Color="#407A4DE0" />
+          <SolidColorBrush x:Key="ListBoxItemForegroundSelected" Color="#5B32B8" />
         </ResourceDictionary>
 
       </ResourceDictionary.ThemeDictionaries>
+
+      <!-- 主区域右上角的暗紫环境光，营造末影虚空感 -->
+      <RadialGradientBrush x:Key="AmbientGlow" Center="78%,0%" RadiusX="0.85" RadiusY="0.85">
+        <GradientStop Color="#4A4B2A83" Offset="0" />
+        <GradientStop Color="#00000000" Offset="1" />
+      </RadialGradientBrush>
     </ResourceDictionary>
   </Application.Resources>
 
   <Application.Styles>
     <FluentTheme />
+
+    <!-- 下拉框统一走暗色卡片配色，避免 Fluent 默认白底破坏暗黑风格 -->
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="{DynamicResource CardBackground}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="ComboBox:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
     <Style Selector="ProgressBar">
       <Setter Property="Foreground" Value="#8B5CF6" />
       <Setter Property="Background" Value="#2A1F45" />

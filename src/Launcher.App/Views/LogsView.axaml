@@ -1,16 +1,184 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Launcher.App.Views.LogsView">
-  <StackPanel Margin="28" Spacing="12">
-    <TextBlock Text="日志" FontSize="26" FontWeight="Bold" />
-    <TextBlock Text="{Binding StatusText}" />
-    <Button Content="加载日志" Command="{Binding LoadCommand}" />
-    <ItemsControl ItemsSource="{Binding Files}">
-      <ItemsControl.ItemTemplate>
-        <DataTemplate>
-          <TextBlock Text="{Binding}" Padding="0,4" FontFamily="Consolas" />
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
-  </StackPanel>
+  <UserControl.Styles>
+    <Style Selector="Border.kind">
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.kind.game">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    </Style>
+    <Style Selector="Border.kind TextBlock">
+      <Setter Property="FontSize" Value="9" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    </Style>
+    <Style Selector="Border.kind.game TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+    <Style Selector="Button.ghost">
+      <Setter Property="Padding" Value="11,5" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.ghost:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid Margin="20,16" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <StackPanel Grid.Column="0" Spacing="1">
+        <TextBlock Text="日志" FontSize="24" FontWeight="Bold"
+                   Foreground="{DynamicResource TextPrimary}" />
+        <TextBlock Text="启动器日志与每次启动的游戏输出（最近 400 行预览）"
+                   FontSize="11" Foreground="{DynamicResource TextMuted}" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <Button Classes="ghost" Content="刷新" Command="{Binding LoadCommand}" />
+        <Button Classes="ghost" Content="打开日志目录" Command="{Binding OpenFolderCommand}" />
+      </StackPanel>
+    </Grid>
+
+    <TextBlock Grid.Row="1" Text="{Binding StatusText}" FontSize="11"
+               Foreground="{DynamicResource TextMuted}" />
+
+    <Grid Grid.Row="2" ColumnDefinitions="232,*" ColumnSpacing="12">
+
+      <!-- 文件列表 -->
+      <Border Grid.Column="0" CornerRadius="12" Padding="8"
+              Background="{DynamicResource GlassBackground}"
+              BorderBrush="{DynamicResource GlassBorder}" BorderThickness="1">
+        <ListBox x:Name="FileList"
+                 ItemsSource="{Binding Files}"
+                 SelectedItem="{Binding SelectedFile}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0">
+          <ListBox.ItemContainerTheme>
+            <ControlTheme TargetType="ListBoxItem">
+              <Setter Property="Padding" Value="8,7" />
+              <Setter Property="Margin" Value="0,0,0,4" />
+              <Setter Property="CornerRadius" Value="8" />
+              <Setter Property="Background" Value="Transparent" />
+              <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="ListBoxItem">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                      <ContentPresenter Name="PART_ContentPresenter"
+                                        Content="{TemplateBinding Content}"
+                                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                    </Border>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+              <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+              </Style>
+              <Style Selector="^:selected">
+                <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+              </Style>
+            </ControlTheme>
+          </ListBox.ItemContainerTheme>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Spacing="3">
+                <Grid ColumnDefinitions="Auto,*">
+                  <Border Grid.Column="0" Classes="kind" Classes.game="{Binding IsGame}">
+                    <TextBlock Text="{Binding KindText}" />
+                  </Border>
+                  <TextBlock Grid.Column="1" Text="{Binding FileName}"
+                             Margin="6,0,0,0" FontSize="11"
+                             Foreground="{DynamicResource TextPrimary}"
+                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </Grid>
+                <TextBlock Text="{Binding TimeText}" FontSize="9"
+                           Foreground="{DynamicResource TextMuted}" />
+                <TextBlock Text="{Binding SizeText}" FontSize="9"
+                           Foreground="{DynamicResource TextMuted}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+
+      <!-- 右侧：本次运行的实时日志 + 历史日志预览 -->
+      <Grid Grid.Column="1" RowDefinitions="Auto,*" RowSpacing="12">
+
+        <!-- 实时日志：本次启动的输出（首页写入，运行中实时追加） -->
+        <Border Grid.Row="0" CornerRadius="12" Padding="12,10"
+                IsVisible="{Binding Live.HasContent}"
+                Background="{DynamicResource GlassBackground}"
+                BorderBrush="{DynamicResource GlassBorder}" BorderThickness="1">
+          <Grid RowDefinitions="Auto,*" RowSpacing="8">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+              <TextBlock Grid.Column="0" Text="运行日志" FontSize="12" FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding Live.FileName}"
+                         Margin="8,0,0,0" FontSize="10" FontFamily="Consolas"
+                         Foreground="{DynamicResource TextMuted}"
+                         VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="2" Text="运行中" FontSize="10"
+                         IsVisible="{Binding Live.IsRunning}"
+                         Foreground="{DynamicResource AccentGlow}" VerticalAlignment="Center" />
+            </Grid>
+            <Border Grid.Row="1" CornerRadius="8" Background="#99100C18"
+                    BorderBrush="#33264A" BorderThickness="1" Padding="6,4"
+                    Height="150">
+              <ScrollViewer x:Name="LiveScroll" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="LiveList" ItemsSource="{Binding Live.Lines}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <SelectableTextBlock Text="{Binding Text}"
+                                           Foreground="{Binding Foreground}"
+                                           FontFamily="Consolas" FontSize="11"
+                                           TextWrapping="NoWrap" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Border>
+          </Grid>
+        </Border>
+
+        <!-- 历史日志预览 -->
+        <Border Grid.Row="1" CornerRadius="12" Padding="12,10"
+                Background="{DynamicResource GlassBackground}"
+                BorderBrush="{DynamicResource GlassBorder}" BorderThickness="1">
+          <Grid RowDefinitions="Auto,*" RowSpacing="8">
+            <TextBlock Grid.Row="0" Text="{Binding PreviewTitle}"
+                       FontSize="12" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"
+                       TextTrimming="CharacterEllipsis" />
+            <Border Grid.Row="1" CornerRadius="8" Background="#99100C18"
+                    BorderBrush="#33264A" BorderThickness="1" Padding="6,4">
+              <TextBox Text="{Binding PreviewText}"
+                       IsReadOnly="True"
+                       AcceptsReturn="True"
+                       IsUndoEnabled="False"
+                       Background="Transparent"
+                       BorderThickness="0"
+                       Padding="6"
+                       FontFamily="Consolas" FontSize="11"
+                       Foreground="{DynamicResource TextSecondary}"
+                       TextWrapping="NoWrap"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+            </Border>
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+  </Grid>
 </UserControl>
