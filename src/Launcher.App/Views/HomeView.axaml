@@ -1,10 +1,111 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Launcher.App.Views"
              x:Class="Launcher.App.Views.HomeView">
 
   <UserControl.Styles>
-    <!-- 超大启动按钮：亮紫渐变底 + 高亮紫色描边，从毛玻璃卡片中跳出 -->
+    <!-- 卡片：半透明紫黑 + 淡紫描边 + 柔和投影 -->
+    <Style Selector="Border.panel">
+      <Setter Property="Background" Value="{DynamicResource GlassBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GlassBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="BoxShadow" Value="0 14 40 0 #52000000" />
+    </Style>
+
+    <!-- 次级按钮 -->
+    <Style Selector="Button.ghost">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GlassBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ghost:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+    <Style Selector="Button.ghost.mini">
+      <Setter Property="Height" Value="26" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+
+    <!-- 登录方式 pill（离线/正版） -->
+    <Style Selector="RadioButton.pill">
+      <Setter Property="Padding" Value="14,4" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border Background="{TemplateBinding Background}"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.pill:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="RadioButton.pill:checked">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- 披风开关：34×19 小圆角胶囊 -->
+    <Style Selector="ToggleButton.switch">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="19" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GlassBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+              <Ellipse Name="Thumb" Width="13" Height="13"
+                       Fill="{DynamicResource AccentGlow}"
+                       HorizontalAlignment="Left"
+                       Margin="2,0,0,0" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton.switch:checked">
+      <Setter Property="Background" Value="#73A275F5" />
+    </Style>
+    <Style Selector="ToggleButton.switch:checked /template/ Ellipse#Thumb">
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="Margin" Value="0,0,2,0" />
+    </Style>
+
+    <!-- 大启动按钮：亮紫渐变 + 高亮描边 + 外发光 -->
     <Style Selector="Button.launch">
+      <Setter Property="Width" Value="260" />
+      <Setter Property="Height" Value="66" />
       <Setter Property="Background">
         <Setter.Value>
           <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
@@ -17,10 +118,8 @@
       <Setter Property="BorderBrush" Value="#CFB2FF" />
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="CornerRadius" Value="16" />
-      <Setter Property="FontSize" Value="24" />
+      <Setter Property="FontSize" Value="22" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Width" Value="330" />
-      <Setter Property="Height" Value="72" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Template">
@@ -30,7 +129,7 @@
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="{TemplateBinding CornerRadius}"
-                    BoxShadow="0 0 34 0 #B38B5CF6">
+                    BoxShadow="0 0 34 0 #8CB38BF5">
               <ContentPresenter Content="{TemplateBinding Content}"
                                 Foreground="{TemplateBinding Foreground}"
                                 FontSize="{TemplateBinding FontSize}"
@@ -50,100 +149,215 @@
       <Setter Property="Background" Value="#553591" />
       <Setter Property="Opacity" Value="0.92" />
     </Style>
+
+    <!-- 「最近游戏」条目：选中 = 淡紫填充 + 亮边 -->
+    <Style Selector="ListBox.recent">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBox.recent ListBoxItem">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="#80241A33" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="ListBox.recent ListBoxItem:pointerover">
+      <Setter Property="Background" Value="#24A275F5" />
+    </Style>
+    <Style Selector="ListBox.recent ListBoxItem:selected">
+      <Setter Property="Background" Value="#A52E1F4D" />
+      <Setter Property="BorderBrush" Value="#73A275F5" />
+    </Style>
+    <Style Selector="ListBox.recent ListBoxItem:selected:pointerover">
+      <Setter Property="Background" Value="#B52E1F4D" />
+    </Style>
   </UserControl.Styles>
 
-  <Grid>
-    <!-- 末影龙飞行剪影水印（极淡，仅作氛围，不遮挡内容） -->
-    <Viewbox Width="460" Height="250"
-             HorizontalAlignment="Right"
-             VerticalAlignment="Bottom"
-             Margin="0,0,-28,-34"
-             Opacity="0.05"
-             IsHitTestVisible="False">
-      <Canvas Width="300" Height="160">
-        <Path Fill="{DynamicResource AccentBrush}"
-              Data="M145 78 L48 18 L40 30 L72 62 L30 58 L70 92 L138 96 Z M158 78 L255 18 L263 30 L231 62 L273 58 L233 92 L165 96 Z M145 78 L128 52 L106 44 L112 56 L132 66 L136 84 L130 104 L142 118 L154 104 L162 88 L160 106 L210 124 L262 118 L262 126 L208 132 L156 120 Z" />
-      </Canvas>
-    </Viewbox>
+  <Grid Margin="26,24,34,26" ColumnDefinitions="236,*" ColumnSpacing="20">
 
-    <!-- 中央启动区域（毛玻璃卡片：账号区位于启动按钮上方 + 超大启动按钮 + 实例选择） -->
-    <Border Width="460"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Padding="28,22"
-            CornerRadius="20"
-            Background="{DynamicResource GlassBackground}"
-            BorderBrush="{DynamicResource GlassBorder}"
-            BorderThickness="1"
-            BoxShadow="0 12 36 0 #80000000">
-      <StackPanel Spacing="10" HorizontalAlignment="Center">
+    <!-- 左列：账号卡 + 皮肤卡 -->
+    <Grid Grid.Column="0" RowDefinitions="Auto,*" RowSpacing="14">
 
-        <!-- 账号区（PCL2 风格，位于启动按钮上方）：登录方式 + 皮肤头像 + 用户名 -->
-        <StackPanel Spacing="4" HorizontalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
-            <RadioButton Classes="mode-pill" GroupName="AuthMode"
-                         Content="离线" Padding="14,6" FontSize="13"
+      <!-- 账号卡：登录方式 pills / 方形头像 + 用户名 / 披风行 -->
+      <Border Grid.Row="0" Classes="panel" Padding="16,16,16,14">
+        <StackPanel Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <RadioButton Classes="pill" GroupName="HomeAuthMode" Content="离线"
                          IsChecked="{Binding $parent[Window].DataContext.Accounts.OfflineMode}" />
-            <RadioButton Classes="mode-pill" GroupName="AuthMode"
-                         Content="正版" Padding="14,6" FontSize="13"
+            <RadioButton Classes="pill" GroupName="HomeAuthMode" Content="正版"
                          IsChecked="{Binding $parent[Window].DataContext.Accounts.OnlineMode}" />
           </StackPanel>
-          <Border Width="64" Height="64" CornerRadius="10"
-                  Background="{DynamicResource ContentBackground}"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1"
-                  ClipToBounds="True"
-                  HorizontalAlignment="Center">
-            <Image Source="{Binding $parent[Window].DataContext.Accounts.Avatar}"
-                   RenderOptions.BitmapInterpolationMode="None"
-                   Stretch="UniformToFill" />
+
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Border Width="52" Height="52" CornerRadius="6"
+                    ClipToBounds="True" Background="#241634"
+                    BorderBrush="#40A275F5" BorderThickness="1">
+              <Image Source="{Binding $parent[Window].DataContext.Accounts.Avatar}"
+                     RenderOptions.BitmapInterpolationMode="None"
+                     Stretch="UniformToFill" />
+            </Border>
+            <StackPanel VerticalAlignment="Center" Spacing="4" MaxWidth="140">
+              <TextBlock Text="{Binding $parent[Window].DataContext.Accounts.Username}"
+                         FontSize="14" Foreground="{DynamicResource TextPrimary}"
+                         TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="离线账户 · 点击登录" FontSize="11"
+                         Foreground="{DynamicResource TextSecondary}"
+                         TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </StackPanel>
+
+          <Border BorderBrush="#1FA275F5" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7"
+                          VerticalAlignment="Center">
+                <Border Width="16" Height="11" CornerRadius="2" ClipToBounds="True"
+                        Background="#33A275F5">
+                  <Image Source="{Binding CapeImage}"
+                         RenderOptions.BitmapInterpolationMode="None"
+                         Stretch="Fill" Opacity="0.45" />
+                </Border>
+                <TextBlock Text="{Binding CapeStatusText}" FontSize="11"
+                           Foreground="{DynamicResource TextSecondary}"
+                           VerticalAlignment="Center" />
+              </StackPanel>
+              <ToggleButton Grid.Column="1" Classes="switch"
+                            IsChecked="{Binding CapeEnabled}"
+                            ToolTip.Tip="显示/隐藏披风" />
+            </Grid>
           </Border>
-          <TextBlock Text="{Binding $parent[Window].DataContext.Accounts.Username}"
-                     FontSize="13" FontWeight="SemiBold"
-                     HorizontalAlignment="Center"
-                     Foreground="{DynamicResource TextPrimary}" />
         </StackPanel>
+      </Border>
 
-        <Button Classes="launch"
-                Command="{Binding LaunchCommand}"
-                Content="启动游戏" />
+      <!-- 皮肤卡：3D 模型舞台 + 导入/默认 + 提示 -->
+      <Border Grid.Row="1" Classes="panel" Padding="14,14,16,16">
+        <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="皮肤模型" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}" />
+            <TextBlock Text="{Binding SkinFormat}" FontSize="11"
+                       Foreground="{DynamicResource TextSecondary}"
+                       VerticalAlignment="Center" />
+          </StackPanel>
 
-        <TextBlock Text="{Binding VersionText}"
-                   FontSize="15"
-                   HorizontalAlignment="Center"
-                   Foreground="{DynamicResource TextSecondary}" />
+          <!-- 皮肤舞台：径向紫光 + 底部阴影 + 自绘 3D 模型 -->
+          <Border Grid.Row="1" CornerRadius="12" ClipToBounds="True"
+                  BorderBrush="#1FA275F5" BorderThickness="1" MinHeight="150">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                <GradientStop Color="#8C2E1F4D" Offset="0" />
+                <GradientStop Color="#59120E18" Offset="1" />
+              </LinearGradientBrush>
+            </Border.Background>
+            <Grid>
+              <Ellipse Width="230" Height="230" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" IsHitTestVisible="False">
+                <Ellipse.Fill>
+                  <RadialGradientBrush Center="50%,50%" RadiusX="0.5" RadiusY="0.5">
+                    <GradientStop Color="#38A275F5" Offset="0" />
+                    <GradientStop Color="#00A275F5" Offset="1" />
+                  </RadialGradientBrush>
+                </Ellipse.Fill>
+              </Ellipse>
 
-        <!-- 实例选择 + 版本设置（并列的双按钮行） -->
-        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-          <ComboBox ItemsSource="{Binding Instances}"
-                    SelectedItem="{Binding SelectedInstance}"
-                    Width="210" Height="40" FontSize="13"
-                    VerticalContentAlignment="Center">
-            <ComboBox.ItemTemplate>
+              <views:SkinPreview Skin="{Binding SkinImage}"
+                                 Cape="{Binding CapeImage}"
+                                 ShowCape="{Binding CapeEnabled}" />
+
+              <Ellipse Width="96" Height="16" Margin="0,0,0,12"
+                       VerticalAlignment="Bottom" Fill="#66000000"
+                       IsHitTestVisible="False">
+                <Ellipse.Effect>
+                  <BlurEffect Radius="6" />
+                </Ellipse.Effect>
+              </Ellipse>
+            </Grid>
+          </Border>
+
+          <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Grid.Column="0" Classes="ghost" Content="导入皮肤"
+                    Click="OnImportSkinClick" />
+            <Button Grid.Column="1" Classes="ghost" Content="默认"
+                    Command="{Binding ResetSkinCommand}" />
+          </Grid>
+
+          <TextBlock Grid.Row="3" Text="拖动旋转 · 滚轮缩放"
+                     FontSize="11" Foreground="{DynamicResource TextSecondary}"
+                     HorizontalAlignment="Center" />
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- 右列：最近游戏 + 状态/启动 -->
+    <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto" RowSpacing="14">
+
+      <Border Grid.Row="0" Classes="panel" Padding="14,14,16,16">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="最近游戏" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost mini" Content="全部实例"
+                    Command="{Binding OpenAllInstancesCommand}" />
+          </Grid>
+
+          <ListBox Classes="recent" MaxHeight="240"
+                   ItemsSource="{Binding Instances}"
+                   SelectedItem="{Binding SelectedInstance}">
+            <ListBox.ItemTemplate>
               <DataTemplate>
-                <TextBlock Text="{Binding Name}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                               Foreground="{DynamicResource TextSecondary}"
+                               TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <Border Grid.Column="1" IsVisible="{Binding IsRecent}"
+                          VerticalAlignment="Center"
+                          CornerRadius="6" Padding="6,2"
+                          Background="Transparent"
+                          BorderBrush="#59C9A7FF" BorderThickness="1">
+                    <TextBlock Text="最近" FontSize="10"
+                               Foreground="{DynamicResource AccentGlow}" />
+                  </Border>
+                </Grid>
               </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-
-          <Button Content="版本设置"
-                  Command="{Binding OpenVersionSettingsCommand}"
-                  Width="112" Height="40"
-                  Padding="0"
-                  CornerRadius="10"
-                  FontSize="13"
-                  HorizontalContentAlignment="Center"
-                  Background="{DynamicResource CardBackground}"
-                  Foreground="{DynamicResource TextPrimary}"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1" />
+            </ListBox.ItemTemplate>
+          </ListBox>
         </StackPanel>
+      </Border>
 
-        <TextBlock Text="{Binding StatusText}"
-                   FontSize="12"
-                   HorizontalAlignment="Center"
-                   Foreground="{DynamicResource TextMuted}" />
-      </StackPanel>
-    </Border>
+      <!-- 状态 + 大启动按钮 -->
+      <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="14">
+        <TextBlock Grid.Column="0" Text="{Binding StatusText}"
+                   FontSize="12" Foreground="{DynamicResource TextSecondary}"
+                   VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" />
+        <Button Grid.Column="1" x:Name="LaunchButton" Classes="launch"
+                Command="{Binding ToggleLaunchCommand}"
+                Content="{Binding LaunchButtonText}" />
+      </Grid>
+    </Grid>
   </Grid>
 </UserControl>

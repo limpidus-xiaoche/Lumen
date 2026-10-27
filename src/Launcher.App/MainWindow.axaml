@@ -95,6 +95,68 @@
         <ScaleTransform />
       </Setter>
     </Style>
+
+    <!-- 导航图标点击动效：末影人生气抖动 / 潜影贝上浮 -->
+    <Style Selector="views|MinecraftPixelIcon">
+      <Setter Property="RenderTransform">
+        <TranslateTransform />
+      </Setter>
+    </Style>
+    <Style Selector="views|MinecraftPixelIcon.angry">
+      <Style.Animations>
+        <Animation Duration="0:0:0.62" Easing="CubicEaseOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="TranslateTransform.X" Value="0" />
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+          <KeyFrame Cue="12%">
+            <Setter Property="TranslateTransform.X" Value="-3" />
+            <Setter Property="TranslateTransform.Y" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="24%">
+            <Setter Property="TranslateTransform.X" Value="3" />
+            <Setter Property="TranslateTransform.Y" Value="-1" />
+          </KeyFrame>
+          <KeyFrame Cue="36%">
+            <Setter Property="TranslateTransform.X" Value="-2" />
+            <Setter Property="TranslateTransform.Y" Value="2" />
+          </KeyFrame>
+          <KeyFrame Cue="48%">
+            <Setter Property="TranslateTransform.X" Value="2" />
+            <Setter Property="TranslateTransform.Y" Value="-2" />
+          </KeyFrame>
+          <KeyFrame Cue="62%">
+            <Setter Property="TranslateTransform.X" Value="-1" />
+            <Setter Property="TranslateTransform.Y" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="TranslateTransform.X" Value="0" />
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="views|MinecraftPixelIcon.hop">
+      <Style.Animations>
+        <Animation Duration="0:0:0.42" Easing="CubicEaseOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+          <KeyFrame Cue="35%">
+            <Setter Property="TranslateTransform.Y" Value="-5" />
+          </KeyFrame>
+          <KeyFrame Cue="70%">
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+          <KeyFrame Cue="85%">
+            <Setter Property="TranslateTransform.Y" Value="-1.5" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
     <Style Selector="Button.nav-icon:pointerover">
       <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
     </Style>
@@ -127,52 +189,20 @@
             chrome:WindowDecorationProperties.ElementRole="TitleBar">
       <DockPanel LastChildFill="False">
 
-        <!-- 左侧：末影龙头 Logo + 品牌标识 -->
+        <!-- 左侧：方形皮肤头像（未登录为默认皮肤） + 品牌标识 -->
         <StackPanel DockPanel.Dock="Left" Margin="14,0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-          <Viewbox Width="32" Height="32" VerticalAlignment="Center">
-            <Canvas Width="32" Height="32">
-              <!-- 头部背后的紫色微光 -->
-              <Ellipse Width="26" Height="24" Canvas.Left="3" Canvas.Top="5" Fill="#33A275F5" />
-              <!-- 体素龙首：方形吻部 + 阶梯轮廓 -->
-              <Path Data="M10 9 L22 9 L22 11 L24 11 L24 17 L23 17 L23 24 L20 24 L20 27 L12 27 L12 24 L9 24 L9 17 L8 17 L8 11 L10 11 Z"
-                    Fill="#1B1426"
-                    Stroke="{DynamicResource AccentBrush}"
-                    StrokeThickness="1.2"
-                    StrokeJoin="Miter" />
-              <!-- 左侧长角：分段上弯，角尖灰白 -->
-              <Path Data="M10 9 L8 8 L8 6 L6 6 L6 4"
-                    Stroke="{DynamicResource AccentBrush}"
-                    StrokeThickness="1.6"
-                    StrokeLineCap="Square"
-                    Fill="Transparent" />
-              <Path Data="M6 4 L4 4 L4 2"
-                    Stroke="#D6CCE4"
-                    StrokeThickness="1.6"
-                    StrokeLineCap="Square"
-                    Fill="Transparent" />
-              <!-- 右侧长角 -->
-              <Path Data="M22 9 L24 8 L24 6 L26 6 L26 4"
-                    Stroke="{DynamicResource AccentBrush}"
-                    StrokeThickness="1.6"
-                    StrokeLineCap="Square"
-                    Fill="Transparent" />
-              <Path Data="M26 4 L28 4 L28 2"
-                    Stroke="#D6CCE4"
-                    StrokeThickness="1.6"
-                    StrokeLineCap="Square"
-                    Fill="Transparent" />
-              <!-- 一双紫色方眼 -->
-              <Rectangle Canvas.Left="11.5" Canvas.Top="14" Width="3" Height="3" Fill="{DynamicResource AccentGlow}" />
-              <Rectangle Canvas.Left="17.5" Canvas.Top="14" Width="3" Height="3" Fill="{DynamicResource AccentGlow}" />
-              <!-- 吻部横线 -->
-              <Path Data="M12.5 21.5 L19.5 21.5"
-                    Stroke="#5A4A78"
-                    StrokeThickness="1"
-                    Fill="Transparent" />
-            </Canvas>
-          </Viewbox>
+          <Border Width="32" Height="32" CornerRadius="5"
+                  ClipToBounds="True"
+                  VerticalAlignment="Center"
+                  Background="#3A2A57"
+                  BorderBrush="#66C9A7FF"
+                  BorderThickness="1">
+            <Image Source="{Binding Accounts.Avatar}"
+                   RenderOptions.BitmapInterpolationMode="None"
+                   Stretch="UniformToFill" />
+          </Border>
           <StackPanel VerticalAlignment="Center" Spacing="-2">
-            <TextBlock Text="麦谷Limpidus" FontSize="16" FontWeight="Bold"
+            <TextBlock Text="LMD Launcher" FontSize="16" FontWeight="Bold"
                        Foreground="{DynamicResource AccentGlow}" />
             <TextBlock Text="启动器" FontSize="11" FontWeight="Medium"
                        Foreground="{DynamicResource TextSecondary}" />
@@ -196,7 +226,8 @@
       <Border Grid.Column="0" Background="{DynamicResource SidebarBackground}">
         <DockPanel>
           <!-- 三大导航按钮：启动 / 下载 / 设置 -->
-          <ListBox DockPanel.Dock="Top"
+          <ListBox x:Name="NavList"
+                   DockPanel.Dock="Top"
                    Margin="10,26,10,0"
                    ItemsSource="{Binding Pages}"
                    SelectedItem="{Binding SelectedPage}"
@@ -303,6 +334,7 @@
           <!-- 底部：任务中心 / 更多入口 + 版本信息 -->
           <StackPanel DockPanel.Dock="Bottom" Margin="10,0,10,16" Spacing="4">
             <Button Classes="nav-icon"
+                    x:Name="BtnTasks"
                     Command="{Binding ShowTasksCommand}"
                     HorizontalAlignment="Stretch"
                     ToolTip.Tip="任务">
@@ -316,6 +348,7 @@
             </Button>
 
             <Button Classes="nav-icon"
+                    x:Name="BtnMore"
                     Command="{Binding ShowMoreCommand}"
                     HorizontalAlignment="Stretch"
                     ToolTip.Tip="更多">
@@ -328,7 +361,7 @@
               </Panel>
             </Button>
 
-            <TextBlock Text="Lumen 0.1 · M2"
+            <TextBlock Text="Lumen 0.1 · M3"
                        Margin="26,0,0,0"
                        FontSize="11"
                        Opacity="0.45"

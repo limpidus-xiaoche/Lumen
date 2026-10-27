@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Launcher.App.Services;
 using Launcher.App.Views;
 using Launcher.Protocol;
 
@@ -28,17 +29,19 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private object? currentPage;
 
-    public MainWindowViewModel(ILauncherFacade facade)
+    public MainWindowViewModel(ILauncherFacade facade, string logsDir)
     {
         _facade = facade;
 
+        var runLog = new RunLogStore();
+
         Accounts = new AccountsViewModel(facade);
-        _instances = new InstancesViewModel(facade);
-        _logs = new LogsViewModel(facade);
+        _instances = new InstancesViewModel(facade, ShowSubPage, ShowHome);
+        _logs = new LogsViewModel(facade, logsDir, runLog);
         _more = new MoreViewModel(facade);
         _taskCenter = new TaskCenterViewModel(facade);
 
-        var home = new HomeViewModel(facade, ShowSubPage, ShowHome);
+        var home = new HomeViewModel(facade, _logs, runLog, _instances, logsDir, ShowSubPage, ShowHome);
         var download = new DownloadViewModel(facade);
         var settings = new SettingsViewModel(facade, _instances, _logs, ShowSubPage);
 

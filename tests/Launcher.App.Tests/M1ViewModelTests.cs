@@ -1,4 +1,5 @@
 using Launcher.App.Mock;
+using Launcher.App.Services;
 using Launcher.App.ViewModels;
 using Xunit;
 
@@ -23,7 +24,10 @@ public sealed class M1ViewModelTests
     {
         var facade = new FakeLauncherFacade();
         var viewModel = new SettingsViewModel(
-            facade, new InstancesViewModel(facade), new LogsViewModel(facade), _ => { });
+            facade,
+            new InstancesViewModel(facade, _ => { }, () => { }),
+            new LogsViewModel(facade, Path.GetTempPath(), new RunLogStore()),
+            _ => { });
 
         await viewModel.LoadJavasCommand.ExecuteAsync(null);
 

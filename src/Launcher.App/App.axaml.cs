@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using Launcher.App.Mock;
 using Launcher.App.Services;
 using Launcher.App.ViewModels;
+using Launcher.Core.Storage;
 using Launcher.Protocol;
 using Serilog;
 
@@ -21,6 +22,10 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             ILauncherFacade facade;
+            var fallbackPaths = LauncherPaths.CreateDefault(
+                LauncherPaths.IsPortableRequested(Environment.GetCommandLineArgs()));
+            var logsDir = fallbackPaths.LogsDir;
+
             if (Environment.GetEnvironmentVariable("LUMEN_FAKE") == "1")
             {
                 facade = new FakeLauncherFacade();
@@ -29,7 +34,9 @@ public partial class App : Application
             {
                 try
                 {
-                    facade = CoreServices.Create().Facade;
+                    var services = CoreServices.Create();
+                    facade = services.Facade;
+                    logsDir = services.Paths.LogsDir;
                 }
                 catch (Exception ex)
                 {
@@ -40,7 +47,7 @@ public partial class App : Application
 
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(facade),
+                DataContext = new MainWindowViewModel(facade, logsDir),
             };
         }
 

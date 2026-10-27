@@ -1,21 +1,140 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Launcher.App.Views.InstancesView">
-  <StackPanel Margin="28" Spacing="12">
-    <TextBlock Text="实例" FontSize="26" FontWeight="Bold" />
-    <TextBlock Text="{Binding StatusText}" />
-    <Button Content="加载实例" Command="{Binding LoadCommand}" />
-    <ItemsControl ItemsSource="{Binding Instances}">
-      <ItemsControl.ItemTemplate>
-        <DataTemplate>
-          <Border Padding="12" Margin="0,4" Background="#1B1E26" CornerRadius="6">
-            <StackPanel Spacing="2">
-              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding VersionId}" Opacity="0.7" />
-            </StackPanel>
-          </Border>
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
-  </StackPanel>
+  <UserControl.Styles>
+    <Style Selector="Border.pill">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="7,2" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.pill.running">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    </Style>
+    <Style Selector="Border.pill TextBlock">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    </Style>
+    <Style Selector="Border.pill.running TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+
+    <Style Selector="Button.card-btn">
+      <Setter Property="Padding" Value="11,5" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.card-btn:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+    <Style Selector="Button.card-btn.primary">
+      <Setter Property="Background">
+        <Setter.Value>
+          <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#6E48BE" Offset="0" />
+            <GradientStop Color="#482C85" Offset="1" />
+          </LinearGradientBrush>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="Foreground" Value="#F8F2FF" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid Margin="20,16" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <StackPanel Grid.Column="0" Spacing="1">
+        <TextBlock Text="实例" FontSize="24" FontWeight="Bold"
+                   Foreground="{DynamicResource TextPrimary}" />
+        <TextBlock Text="左侧启动按钮使用这里选中的实例；卡片可直接启动 / 停止 / 修复"
+                   FontSize="11" Foreground="{DynamicResource TextMuted}" />
+      </StackPanel>
+      <Button Grid.Column="1" Classes="card-btn" Content="刷新"
+              Command="{Binding LoadCommand}" VerticalAlignment="Center" />
+    </Grid>
+
+    <TextBlock Grid.Row="1" Text="{Binding StatusText}" FontSize="11"
+               Foreground="{DynamicResource TextMuted}" />
+
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
+        <TextBlock Text="还没有实例" IsVisible="{Binding IsEmpty}"
+                   FontSize="13" Foreground="{DynamicResource TextMuted}" Margin="0,18,0,0" />
+
+        <ItemsControl ItemsSource="{Binding Instances}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Background="{DynamicResource GlassBackground}" CornerRadius="12"
+                      BorderBrush="{DynamicResource GlassBorder}" BorderThickness="1"
+                      Padding="14,12" Margin="0,0,0,10">
+                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+
+                  <!-- 名称 + 状态 + 启动/停止 -->
+                  <Grid Grid.Row="0" ColumnDefinitions="34,*,Auto" ColumnSpacing="10">
+                    <Border Grid.Column="0" Width="34" Height="34" CornerRadius="8"
+                            Background="#332A1E45" BorderBrush="#4A3A63" BorderThickness="1"
+                            VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Initial}" FontSize="15" FontWeight="Bold"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource AccentGlow}" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}" />
+                        <Border Classes="pill" Classes.running="{Binding IsRunning}">
+                          <TextBlock Text="{Binding StatusText}" />
+                        </Border>
+                      </StackPanel>
+                      <TextBlock Text="{Binding VersionLine}" FontSize="11"
+                                 Foreground="{DynamicResource TextSecondary}" />
+                      <TextBlock Text="{Binding LastPlayedText}" FontSize="10"
+                                 Foreground="{DynamicResource TextMuted}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                                VerticalAlignment="Center">
+                      <Button Classes="card-btn primary" Content="启动"
+                              IsVisible="{Binding CanLaunch}"
+                              Command="{Binding $parent[ItemsControl].DataContext.LaunchCommand}"
+                              CommandParameter="{Binding}" />
+                      <Button Classes="card-btn" Content="停止"
+                              IsVisible="{Binding CanStop}"
+                              Foreground="#FF9B93"
+                              Command="{Binding $parent[ItemsControl].DataContext.StopCommand}"
+                              CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </Grid>
+
+                  <!-- 最近活动 -->
+                  <TextBlock Grid.Row="1" Text="{Binding ActivityText}"
+                             IsVisible="{Binding HasActivity}"
+                             FontSize="10" TextWrapping="Wrap" MaxHeight="40"
+                             Foreground="{DynamicResource AccentGlow}" />
+
+                  <!-- 运维操作 -->
+                  <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="6">
+                    <Button Classes="card-btn" Content="修复"
+                            IsVisible="{Binding CanRepair}"
+                            Command="{Binding $parent[ItemsControl].DataContext.RepairCommand}"
+                            CommandParameter="{Binding}" />
+                    <Button Classes="card-btn" Content="打开目录"
+                            Command="{Binding $parent[ItemsControl].DataContext.OpenFolderCommand}"
+                            CommandParameter="{Binding}" />
+                    <Button Classes="card-btn" Content="版本设置"
+                            Command="{Binding $parent[ItemsControl].DataContext.OpenVersionSettingsCommand}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
 </UserControl>
