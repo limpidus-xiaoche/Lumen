@@ -79,6 +79,43 @@
       <Setter Property="Background" Value="#C42B1C" />
       <Setter Property="Foreground" Value="White" />
     </Style>
+
+    <!-- 侧栏底部图标按钮（任务 / 更多）：点击回弹动画 -->
+    <Style Selector="Button.nav-icon">
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Padding" Value="0,14" />
+      <Setter Property="Margin" Value="4,6" />
+      <Setter Property="MinHeight" Value="56" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+      <Setter Property="RenderTransform">
+        <ScaleTransform />
+      </Setter>
+    </Style>
+    <Style Selector="Button.nav-icon:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="Button.nav-icon:pressed">
+      <Style.Animations>
+        <Animation Duration="0:0:0.16" Easing="CubicEaseOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="ScaleTransform.ScaleX" Value="1" />
+            <Setter Property="ScaleTransform.ScaleY" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="45%">
+            <Setter Property="ScaleTransform.ScaleX" Value="0.93" />
+            <Setter Property="ScaleTransform.ScaleY" Value="0.93" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="ScaleTransform.ScaleX" Value="1" />
+            <Setter Property="ScaleTransform.ScaleY" Value="1" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
   </Window.Styles>
 
   <Grid RowDefinitions="52,*">
@@ -167,15 +204,19 @@
                    BorderThickness="0">
             <ListBox.ItemContainerTheme>
               <ControlTheme TargetType="ListBoxItem">
-                <Setter Property="Padding" Value="22,16" />
-                <Setter Property="Margin" Value="4,8" />
+                <Setter Property="Padding" Value="0,14" />
+                <Setter Property="Margin" Value="4,6" />
                 <Setter Property="FontSize" Value="17" />
-                <Setter Property="MinHeight" Value="52" />
+                <Setter Property="MinHeight" Value="56" />
                 <Setter Property="CornerRadius" Value="12" />
-                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+                <Setter Property="RenderTransform">
+                  <ScaleTransform />
+                </Setter>
                 <Setter Property="Template">
                   <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -201,52 +242,90 @@
                   <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
                   <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
                   <Setter Property="FontWeight" Value="SemiBold" />
+                  <!-- 点击选中时图标轻微回弹 -->
+                  <Style.Animations>
+                    <Animation Duration="0:0:0.26" Easing="CubicEaseOut">
+                      <KeyFrame Cue="0%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                      </KeyFrame>
+                      <KeyFrame Cue="55%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1.06" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1.06" />
+                      </KeyFrame>
+                      <KeyFrame Cue="100%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                      </KeyFrame>
+                    </Animation>
+                  </Style.Animations>
+                </Style>
+                <Style Selector="^:pressed">
+                  <Style.Animations>
+                    <Animation Duration="0:0:0.16" Easing="CubicEaseOut">
+                      <KeyFrame Cue="0%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                      </KeyFrame>
+                      <KeyFrame Cue="45%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="0.93" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="0.93" />
+                      </KeyFrame>
+                      <KeyFrame Cue="100%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                      </KeyFrame>
+                    </Animation>
+                  </Style.Animations>
                 </Style>
               </ControlTheme>
             </ListBox.ItemContainerTheme>
             <ListBox.ItemTemplate>
               <DataTemplate>
-                <TextBlock Text="{Binding Title}" />
+                <Panel ToolTip.Tip="{Binding Title}" Width="52" Height="44">
+                  <!-- 原版物品栏式底槽，让深色图标在暗色侧栏上也有足够对比 -->
+                  <Border Width="42" Height="42"
+                          CornerRadius="9"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Background="#241A33"
+                          BorderBrush="#4A3A63"
+                          BorderThickness="1" />
+                  <views:MinecraftPixelIcon Kind="{Binding Icon}"
+                                            Width="32" Height="32"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center" />
+                </Panel>
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
 
           <!-- 底部：任务中心 / 更多入口 + 版本信息 -->
           <StackPanel DockPanel.Dock="Bottom" Margin="10,0,10,16" Spacing="4">
-            <Button Content="任务"
+            <Button Classes="nav-icon"
                     Command="{Binding ShowTasksCommand}"
                     HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Left"
-                    Padding="22,16"
-                    Margin="4,8"
-                    MinHeight="52"
-                    CornerRadius="12"
-                    FontSize="17"
-                    Background="Transparent"
-                    Foreground="{DynamicResource TextSecondary}">
-              <Button.Styles>
-                <Style Selector="Button:pointerover">
-                  <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
-                </Style>
-              </Button.Styles>
+                    ToolTip.Tip="任务">
+              <Panel Width="52" Height="44">
+                <Border Width="42" Height="42" CornerRadius="9"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="#241A33" BorderBrush="#4A3A63" BorderThickness="1" />
+                <views:MinecraftPixelIcon Kind="EnchantedBook" Width="32" Height="32"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Panel>
             </Button>
 
-            <Button Content="更多"
+            <Button Classes="nav-icon"
                     Command="{Binding ShowMoreCommand}"
                     HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Left"
-                    Padding="22,16"
-                    Margin="4,8"
-                    MinHeight="52"
-                    CornerRadius="12"
-                    FontSize="17"
-                    Background="Transparent"
-                    Foreground="{DynamicResource TextSecondary}">
-              <Button.Styles>
-                <Style Selector="Button:pointerover">
-                  <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
-                </Style>
-              </Button.Styles>
+                    ToolTip.Tip="更多">
+              <Panel Width="52" Height="44">
+                <Border Width="42" Height="42" CornerRadius="9"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="#241A33" BorderBrush="#4A3A63" BorderThickness="1" />
+                <views:MinecraftPixelIcon Kind="EyeOfEnder" Width="32" Height="32"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Panel>
             </Button>
 
             <TextBlock Text="Lumen 0.1 · M2"

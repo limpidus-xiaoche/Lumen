@@ -1,11 +1,12 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Launcher.App.Views;
 using Launcher.Protocol;
 
 namespace Launcher.App.ViewModels;
 
-public sealed record NavItem(string Title, object ViewModel);
+public sealed record NavItem(string Title, object ViewModel, IconKind Icon);
 
 public partial class MainWindowViewModel : ObservableObject
 {
@@ -43,9 +44,9 @@ public partial class MainWindowViewModel : ObservableObject
 
         Pages =
         [
-            new NavItem("启动", home),
-            new NavItem("下载", download),
-            new NavItem("设置", settings),
+            new NavItem("启动", home, IconKind.Enderman),
+            new NavItem("下载", download, IconKind.Shulker),
+            new NavItem("设置", settings, IconKind.EndRod),
         ];
 
         SelectedPage = Pages[0];
