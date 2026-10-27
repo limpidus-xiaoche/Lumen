@@ -16,8 +16,40 @@ public sealed class VersionDetail
     [JsonPropertyName("libraries")] public List<Library> Libraries { get; set; } = [];
     [JsonPropertyName("arguments")] public VersionArguments? Arguments { get; set; }
     [JsonPropertyName("minecraftArguments")] public string? MinecraftArguments { get; set; }
-    /// <summary>发布时间。Fabric profile 里是「+0000」形式，按字符串保留避免解析失败。</summary>
-    [JsonPropertyName("releaseTime")] public string? ReleaseTime { get; set; }
+    [JsonPropertyName("releaseTime")]
+    [JsonConverter(typeof(TolerantDateTimeOffsetConverter))]
+    public DateTimeOffset? ReleaseTime { get; set; }
+}
+
+/// <summary>
+/// 加载器 JSON 可能出现空串或非法时间（例如 Fabric profile 的 releaseTime: ""），统一按 null 处理。
+/// </summary>
+internal sealed class TolerantDateTimeOffsetConverter : JsonConverter<DateTimeOffset?>
+{
+    public override DateTimeOffset? Read(
+        ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String)
+        {
+            reader.Skip();
+            return null;
+        }
+
+        var text = reader.GetString();
+        return DateTimeOffset.TryParse(text, out var value) ? value : null;
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options)
+    {
+        if (value is null)
+        {
+            writer.WriteNullValue();
+            return;
+        }
+
+        writer.WriteStringValue(value.Value);
+    }
 }
 
 public sealed class AssetIndexRef

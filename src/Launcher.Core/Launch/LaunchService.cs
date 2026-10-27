@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Text;
+using Launcher.Core.Accounts;
 using Launcher.Core.Auth;
 using Launcher.Core.Game;
+using Launcher.Core.Install;
 using Launcher.Core.Java;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
@@ -19,6 +21,9 @@ public sealed class LaunchService
     private readonly JavaLocator _javaLocator;
     private readonly RunningSessionStore _running;
     private readonly ILogger<LaunchService> _logger;
+    private readonly AccountStore? _accounts;
+    private readonly MicrosoftAuth? _microsoft;
+    private readonly AuthlibInjector? _authlibInjector;
 
     public LaunchService(
         LauncherPaths paths,
@@ -27,7 +32,10 @@ public sealed class LaunchService
         VersionResolver resolver,
         JavaLocator javaLocator,
         RunningSessionStore running,
-        ILogger<LaunchService> logger)
+        ILogger<LaunchService> logger,
+        AccountStore? accounts = null,
+        MicrosoftAuth? microsoft = null,
+        AuthlibInjector? authlibInjector = null)
     {
         _paths = paths;
         _settings = settings;
@@ -36,6 +44,9 @@ public sealed class LaunchService
         _javaLocator = javaLocator;
         _running = running;
         _logger = logger;
+        _accounts = accounts;
+        _microsoft = microsoft;
+        _authlibInjector = authlibInjector;
     }
 
     public async Task<GameSession> LaunchAsync(
@@ -55,13 +66,18 @@ public sealed class LaunchService
             throw new LaunchException("E3003", $"实例当前状态为 {instance.State}，请先修复");
         }
 
-        var detail = await _resolver.ResolveAsync(instance.VersionId, instance.Loader, instance.LoaderVersion, ct);
+        var effectiveVersionId = LoaderIds.EffectiveVersionId(
+            instance.VersionId, instance.Loader, instance.LoaderVersion);
+        var detail = await _resolver.ResolveAsync(effectiveVersionId, ct);
         var settings = _settings.Load();
         var java = SelectJava(detail, settings);
 
-        var gameDir = instance.Isolation == IsolationLevel.None
-            ? Path.Combine(_paths.SharedDir, "game")
-            : Path.Combine(_paths.InstancesDir, instanceId);
+        var rootPath = await _sqlite.GetRootPathAsync(instanceId, ct);
+        var gameDir = !string.IsNullOrWhiteSpace(rootPath)
+            ? rootPath
+            : instance.Isolation == IsolationLevel.None
+                ? Path.Combine(_paths.SharedDir, "game")
+                : Path.Combine(_paths.InstancesDir, instanceId);
 
         GameOptions.EnsureDefaultLanguage(gameDir);
 
@@ -81,37 +97,47 @@ public sealed class LaunchService
 
         var classpath = ArgumentBuilder.BuildClasspath(detail, librariesDir, versionJar);
 
-        var player = string.IsNullOrWhiteSpace(username) ? "Player" : username.Trim();
-        var identity = OfflineAuth.Create(player);
-        var undashed = identity.Uuid.Replace("-", string.Empty);
+        var credentials = await ResolveCredentialsAsync(username, ct);
+        var undashed = credentials.Uuid.Replace("-", string.Empty);
 
         var variables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["auth_player_name"] = player,
+            ["auth_player_name"] = credentials.Username,
             ["version_name"] = instance.VersionId,
             ["game_directory"] = gameDir,
             ["assets_root"] = assetsRoot,
             ["assets_index_name"] = assetIndexId,
             ["auth_uuid"] = undashed,
-            ["auth_access_token"] = identity.AccessToken,
-            ["user_type"] = "msa",
+            ["auth_access_token"] = credentials.AccessToken,
+            ["user_type"] = credentials.UserType,
             ["version_type"] = "Lumen",
             ["resolution_width"] = "854",
             ["resolution_height"] = "480",
             ["launcher_name"] = "Lumen",
             ["launcher_version"] = "0.1.0",
-            ["clientid"] = undashed,
-            ["auth_xuid"] = undashed,
+            ["clientid"] = string.Empty,
+            ["auth_xuid"] = string.Empty,
             ["user_properties"] = "{}",
             ["quickPlayPath"] = Path.Combine(gameDir, "quickPlay"),
             ["quickPlaySingleplayer"] = string.Empty,
             ["quickPlayMultiplayer"] = string.Empty,
         };
 
+        var extraJvmArgs = new List<string>();
+        if (credentials.AuthlibServer is not null)
+        {
+            if (_authlibInjector is null)
+            {
+                throw new LaunchException("E7001", "authlib-injector 未注入，无法启动外置账户。");
+            }
+
+            extraJvmArgs.Add(await _authlibInjector.BuildJavaAgentAsync(credentials.AuthlibServer, ct));
+        }
+
         var useG1 = JavaVersionPolicy.RequiredMajor(detail) >= 21;
         var command = ArgumentBuilder.Build(
             detail, classpath, gameDir, assetsRoot, assetIndexId, nativesDir, librariesDir,
-            variables, settings.MaxMemoryMb, string.Empty, useG1);
+            variables, settings.MaxMemoryMb, extraJvmArgs, useG1);
 
         var estimatedLength = command.Args.Sum(a => (long)a.Length + 3);
         string? argFile = null;
@@ -254,6 +280,65 @@ public sealed class LaunchService
 
     public Task<IReadOnlyList<RunningSession>> GetRunningSessionsAsync(CancellationToken ct) =>
         Task.FromResult(_running.GetAlive());
+
+    /// <summary>
+    /// 启动凭据来源：显式离线用户名 &gt; 当前激活账户 &gt; 默认离线 Player。
+    /// </summary>
+    private async Task<LaunchCredentials> ResolveCredentialsAsync(string? username, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            var offline = OfflineAuth.Create(username.Trim());
+            return new LaunchCredentials(offline.Username, offline.Uuid, offline.AccessToken, "legacy", null);
+        }
+
+        var account = _accounts?.GetActive();
+        if (account is null)
+        {
+            var fallback = OfflineAuth.Create("Player");
+            return new LaunchCredentials(fallback.Username, fallback.Uuid, fallback.AccessToken, "legacy", null);
+        }
+
+        if (account.Type == AuthMode.Microsoft &&
+            _microsoft is not null &&
+            account.RefreshToken is { Length: > 0 } refreshToken &&
+            account.ExpiresAt is { } expiresAt &&
+            expiresAt <= DateTimeOffset.UtcNow.AddMinutes(5))
+        {
+            var refreshed = await _microsoft.RefreshAsync(refreshToken, ct);
+            account = account with
+            {
+                Username = refreshed.Username,
+                Uuid = refreshed.Uuid,
+                AccessToken = refreshed.AccessToken,
+                RefreshToken = refreshed.RefreshToken,
+                ExpiresAt = refreshed.ExpiresAt,
+            };
+            _accounts!.Upsert(account);
+            _logger.LogInformation("Microsoft 令牌已刷新：{Username}", account.Username);
+        }
+
+        if (account.Type == AuthMode.Authlib && string.IsNullOrWhiteSpace(account.ServerUrl))
+        {
+            throw new LaunchException("E7001", "外置账户缺少服务器地址，请重新登录。");
+        }
+
+        var userType = account.Type switch
+        {
+            AuthMode.Microsoft => "msa",
+            AuthMode.Authlib => "mojang",
+            _ => "legacy",
+        };
+
+        return new LaunchCredentials(account.Username, account.Uuid, account.AccessToken, userType, account.ServerUrl);
+    }
+
+    private sealed record LaunchCredentials(
+        string Username,
+        string Uuid,
+        string AccessToken,
+        string UserType,
+        string? AuthlibServer);
 
     private JavaRuntime SelectJava(VersionDetail detail, AppSettings settings)
     {

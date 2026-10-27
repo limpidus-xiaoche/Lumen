@@ -24,19 +24,33 @@ public static class UrlGuard
         "resources.download.minecraft.net",
         "libraries.minecraft.net",
         "bmclapi2.bangbang93.com",
+        "bmclapi2.sakura.exp.dog",
         "api.modrinth.com",
         "cdn.modrinth.com",
         "maven.minecraftforge.net",
         "maven.neoforged.net",
+        "meta.fabricmc.net",
         "maven.fabricmc.net",
+        "files.minecraftforge.net",
         "maven.quiltmc.org",
         "github.com",
         "api.github.com",
         "objects.githubusercontent.com",
         "raw.githubusercontent.com",
+        "login.live.com",
+        "login.microsoftonline.com",
+        "user.auth.xboxlive.com",
+        "xsts.auth.xboxlive.com",
+        "api.minecraftservices.com",
     };
 
-    public static void Validate(string url, bool allowLoopback = false)
+    public static void Validate(string url, bool allowLoopback = false) =>
+        ValidateCore(url, allowLoopback, requireAllowlist: true);
+
+    public static void ValidatePublicHttps(string url) =>
+        ValidateCore(url, allowLoopback: false, requireAllowlist: false);
+
+    private static void ValidateCore(string url, bool allowLoopback, bool requireAllowlist)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
@@ -60,7 +74,9 @@ public static class UrlGuard
 
         var isLoopbackHost = uri.IsLoopback ||
                              string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase);
-        if (!AllowedHosts.Contains(uri.Host) && !(allowLoopback && isLoopbackHost))
+        if (requireAllowlist &&
+            !AllowedHosts.Contains(uri.Host) &&
+            !(allowLoopback && isLoopbackHost))
         {
             throw new DownloadException("E2001", $"host 不在白名单：{uri.Host}");
         }

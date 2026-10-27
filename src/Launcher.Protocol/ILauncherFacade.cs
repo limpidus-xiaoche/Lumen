@@ -64,6 +64,9 @@ public interface ILauncherFacade
     Task<UpdateInfo?> CheckUpdateAsync(CancellationToken ct);
     Task ApplyUpdateAsync(UpdateInfo info, IProgress<UpdateProgress> progress, CancellationToken ct);
 
+    // 完整性（§12.1）
+    Task<IntegrityReport> VerifyIntegrityAsync(IntegrityCheckMode mode, CancellationToken ct);
+
     // 日志 / 诊断
     Task<IReadOnlyList<LogFileInfo>> GetLogFilesAsync(string? instanceId, CancellationToken ct);
     Task<string> ExportDiagnosticsAsync(string? instanceId, CancellationToken ct);

@@ -1,82 +1,50 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Interactivity;
-using Avalonia.VisualTree;
-using Launcher.App.Audio;
-using Launcher.App.ViewModels;
-using Launcher.App.Views;
 
 namespace Launcher.App;
 
 public partial class MainWindow : Window
 {
+    private bool _classic;
+
     public MainWindow()
     {
         InitializeComponent();
-
-        BtnMin.Click += (_, _) => WindowState = WindowState.Minimized;
-        BtnClose.Click += (_, _) => Close();
-
-        BtnTasks.Click += (_, _) => SoundFx.Play(SoundFx.Kind.Book);
-        BtnMore.Click += (_, _) => SoundFx.Play(SoundFx.Kind.Eye);
-
-        // 用 Tapped 而不是 SelectionChanged：重复点击当前页也能播放音效与动画
-        NavList.AddHandler(InputElement.TappedEvent, OnNavTapped, RoutingStrategies.Bubble, handledEventsToo: true);
+        Immersive.ClassicViewRequested += (_, _) => ToggleShell();
+        KeyDown += OnKeyDown;
     }
 
-    private void OnNavTapped(object? sender, TappedEventArgs e)
+    private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Source is not Visual source)
+        if (e.Key != Key.F2)
         {
             return;
         }
 
-        if (source.FindAncestorOfType<ListBoxItem>(includeSelf: true)?.DataContext is not NavItem item)
-        {
-            return;
-        }
-
-        var icon = source.GetVisualDescendants().OfType<MinecraftPixelIcon>().FirstOrDefault();
-
-        switch (item.Icon)
-        {
-            case IconKind.Enderman:
-                // 末影人被盯视时的生气抖动 + 叫声
-                SoundFx.Play(SoundFx.Kind.Enderman);
-                _ = FlashAsync(icon, "angry");
-                break;
-
-            case IconKind.Shulker:
-                // 潜影贝先开壳，随后吐出子弹
-                SoundFx.Play(SoundFx.Kind.ShulkerOpen);
-                _ = FlashAsync(icon, "hop");
-                _ = PlayShulkerShotAsync();
-                break;
-
-            case IconKind.EndRod:
-                SoundFx.Play(SoundFx.Kind.Chime);
-                break;
-        }
+        ToggleShell();
+        e.Handled = true;
     }
 
-    private static async Task PlayShulkerShotAsync()
+    /// <summary>F2 在沉浸式与经典视图之间切换；经典视图恢复普通窗口装饰与可缩放。</summary>
+    public void ToggleShell()
     {
-        await Task.Delay(320);
-        SoundFx.Play(SoundFx.Kind.ShulkerShoot);
-    }
+        _classic = !_classic;
+        Immersive.IsVisible = !_classic;
+        Classic.IsVisible = _classic;
 
-    private static async Task FlashAsync(Control? icon, string className)
-    {
-        if (icon is null)
+        if (_classic)
         {
-            return;
+            WindowDecorations = WindowDecorations.BorderOnly;
+            CanResize = true;
+            WindowState = WindowState.Normal;
+            Width = 1100;
+            Height = 700;
         }
-
-        icon.Classes.Remove(className);
-        await Task.Yield();
-        icon.Classes.Add(className);
-        await Task.Delay(700);
-        icon.Classes.Remove(className);
+        else
+        {
+            WindowDecorations = WindowDecorations.None;
+            CanResize = false;
+            WindowState = WindowState.FullScreen;
+        }
     }
 }

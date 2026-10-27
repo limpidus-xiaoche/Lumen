@@ -14,10 +14,13 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Serilog.Extensions.Logging" />
     <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="StbImageSharp" />
+    <PackageReference Include="Velopack" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Launcher.Core\Launcher.Core.csproj" />
     <ProjectReference Include="..\Launcher.Protocol\Launcher.Protocol.csproj" />
+    <ProjectReference Include="..\Launcher.Render\Launcher.Render.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets\**\*.png" />

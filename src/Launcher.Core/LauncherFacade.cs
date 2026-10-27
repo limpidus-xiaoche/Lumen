@@ -2,12 +2,16 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Launcher.Core.Accounts;
 using Launcher.Core.Auth;
+using Launcher.Core.Diagnostics;
 using Launcher.Core.Install;
+using Launcher.Core.Instances;
 using Launcher.Core.Java;
 using Launcher.Core.Launch;
 using Launcher.Core.Meta;
 using Launcher.Core.Storage;
+using Launcher.Core.Update;
 using Launcher.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -24,6 +28,14 @@ public sealed class LauncherFacade : ILauncherFacade
     private readonly VanillaInstaller? _installer;
     private readonly LaunchService? _launcher;
     private readonly TaskRegistry _tasks;
+    private readonly AccountStore? _accounts;
+    private readonly MicrosoftAuth? _microsoft;
+    private readonly AuthlibAuth? _authlib;
+    private readonly LoaderCatalog? _loaderCatalog;
+    private readonly ModpackInstaller? _modpackInstaller;
+    private readonly IntegrityService _integrity;
+    private readonly UpdateService _update;
+    private readonly DiagnosticsExporter _diagnostics;
     private readonly ModrinthClient _modrinth;
     private readonly CurseForgeClient _curseForge;
     private readonly LoaderMetaClient? _loaderMeta;
@@ -38,7 +50,15 @@ public sealed class LauncherFacade : ILauncherFacade
         VanillaInstaller? installer = null,
         TaskRegistry? tasks = null,
         LaunchService? launcher = null,
-        LoaderMetaClient? loaderMeta = null)
+        LoaderMetaClient? loaderMeta = null,
+        AccountStore? accounts = null,
+        MicrosoftAuth? microsoft = null,
+        AuthlibAuth? authlib = null,
+        LoaderCatalog? loaderCatalog = null,
+        ModpackInstaller? modpackInstaller = null,
+        IntegrityService? integrity = null,
+        UpdateService? updateService = null,
+        DiagnosticsExporter? diagnostics = null)
     {
         _paths = paths;
         _settingsStore = settingsStore;
@@ -50,6 +70,15 @@ public sealed class LauncherFacade : ILauncherFacade
         _tasks = tasks ?? new TaskRegistry();
         _launcher = launcher;
         _loaderMeta = loaderMeta;
+        _accounts = accounts;
+        _microsoft = microsoft;
+        _authlib = authlib;
+        _loaderCatalog = loaderCatalog;
+        _modpackInstaller = modpackInstaller;
+        _integrity = integrity ?? new IntegrityService(paths);
+        _update = updateService ?? new UpdateService(paths, integrity: _integrity);
+        _diagnostics = diagnostics
+                       ?? new DiagnosticsExporter(paths, settingsStore, sqlite, javaLocator);
         _modrinth = new ModrinthClient(paths.CacheDir);
         _curseForge = new CurseForgeClient(paths.CacheDir);
     }
@@ -62,8 +91,8 @@ public sealed class LauncherFacade : ILauncherFacade
         return new LauncherSnapshot(
             settings,
             instances,
-            Array.Empty<AccountSummary>(),
-            ActiveAccountId: null,
+            _accounts?.GetSummaries() ?? Array.Empty<AccountSummary>(),
+            _accounts?.ActiveId,
             javas,
             ManifestUpdatedAt: null,
             AppVersion: typeof(LauncherFacade).Assembly.GetName().Version?.ToString() ?? "0.0.0");
@@ -81,10 +110,17 @@ public sealed class LauncherFacade : ILauncherFacade
     }
 
     public Task<IReadOnlyList<LoaderVersionInfo>> GetLoaderVersionsAsync(
-        LoaderKind loader, string gameVersion, CancellationToken ct) =>
-        _loaderMeta is null
+        LoaderKind loader, string gameVersion, CancellationToken ct)
+    {
+        if (_loaderCatalog is not null)
+        {
+            return _loaderCatalog.GetVersionsAsync(loader, gameVersion, ct);
+        }
+
+        return _loaderMeta is null
             ? Task.FromResult<IReadOnlyList<LoaderVersionInfo>>(Array.Empty<LoaderVersionInfo>())
             : _loaderMeta.GetVersionsAsync(loader, gameVersion, ct);
+    }
 
     public async Task<InstanceDetail> GetInstanceAsync(string instanceId, CancellationToken ct)
     {
@@ -92,13 +128,14 @@ public sealed class LauncherFacade : ILauncherFacade
         var summary = instances.FirstOrDefault(i => i.Id == instanceId)
             ?? throw new KeyNotFoundException($"实例不存在：{instanceId}");
 
+        var gameDir = await ResolveGameDirAsync(summary, ct);
         return new InstanceDetail(
             summary,
-            Path.Combine(_paths.InstancesDir, instanceId),
+            gameDir,
             JavaPath: null,
             MemoryMb: _settingsStore.Load().MaxMemoryMb,
             ExtraJvmArgs: string.Empty,
-            ModCount: 0,
+            ModCount: ModScanner.Scan(gameDir, summary.Loader).Count,
             DiskUsageBytes: 0);
     }
 
@@ -173,9 +210,30 @@ public sealed class LauncherFacade : ILauncherFacade
         InstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
         _installer!.InstallAsync(request, progress, ct);
 
-    public Task UpdateInstanceAsync(
-        string instanceId, UpdateInstanceRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M2 未实现实例更新。");
+    public async Task UpdateInstanceAsync(
+        string instanceId, UpdateInstanceRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        var instances = await _sqlite.GetInstancesAsync(ct);
+        var current = instances.FirstOrDefault(i => i.Id == instanceId)
+            ?? throw new KeyNotFoundException($"实例不存在：{instanceId}");
+
+        if (request.MemoryMb is { } memoryMb)
+        {
+            var settings = _settingsStore.Load();
+            _settingsStore.Save(settings with { MaxMemoryMb = memoryMb });
+        }
+
+        var install = new InstallRequest(
+            instanceId,
+            request.DisplayName ?? current.Name,
+            request.VersionId ?? current.VersionId,
+            request.Loader ?? current.Loader,
+            request.LoaderVersion ?? current.LoaderVersion,
+            request.Isolation ?? current.Isolation,
+            InstallMode.ChangeLoader);
+
+        await InstallAsync(install, progress, ct);
+    }
 
     public async Task RepairInstanceAsync(
         string instanceId, IProgress<InstallProgress> progress, CancellationToken ct)
@@ -198,8 +256,15 @@ public sealed class LauncherFacade : ILauncherFacade
     }
 
     public Task<InstanceSummary> InstallModpackAsync(
-        ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现整合包安装。");
+        ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        if (_modpackInstaller is null)
+        {
+            throw new NotSupportedException("整合包安装器未注入。");
+        }
+
+        return _modpackInstaller.InstallAsync(request, progress, ct);
+    }
 
     public async Task<GameSession> LaunchAsync(
         string instanceId, IProgress<LaunchEvent> events, CancellationToken ct)
@@ -232,70 +297,131 @@ public sealed class LauncherFacade : ILauncherFacade
         return _launcher.GetRunningSessionsAsync(ct);
     }
 
-    public Task<AccountSummary> LoginAsync(
+    public async Task<AccountSummary> LoginAsync(
         LoginRequest request, IProgress<LoginEvent> progress, CancellationToken ct)
     {
-        if (request.Mode != AuthMode.Offline)
+        if (_accounts is null)
         {
-            throw new NotSupportedException("M0 仅支持离线账户。");
+            throw new NotSupportedException("账户存储未注入。");
         }
 
-        var identity = OfflineAuth.Create(request.Username ?? "Player");
-        progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"离线账户：{identity.Username}"));
-        return Task.FromResult(new AccountSummary(
-            identity.Uuid,
-            AuthMode.Offline,
-            identity.Username,
-            identity.Uuid,
-            AvatarUrl: null,
-            IsActive: true,
-            ExpiresAt: null));
+        StoredAccount account;
+        switch (request.Mode)
+        {
+            case AuthMode.Offline:
+            {
+                var identity = OfflineAuth.Create(
+                    string.IsNullOrWhiteSpace(request.Username) ? "Player" : request.Username.Trim());
+                account = new StoredAccount(
+                    $"offline:{identity.Uuid}", AuthMode.Offline, identity.Username, identity.Uuid,
+                    AvatarUrl: null, identity.AccessToken, RefreshToken: null, ExpiresAt: null);
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"离线账户：{identity.Username}"));
+                break;
+            }
+
+            case AuthMode.Microsoft:
+            {
+                if (_microsoft is null)
+                {
+                    throw new NotSupportedException("Microsoft 登录未注入。");
+                }
+
+                var result = await _microsoft.LoginAsync(progress, ct);
+                account = new StoredAccount(
+                    $"msa:{result.Uuid}", AuthMode.Microsoft, result.Username, result.Uuid,
+                    result.AvatarUrl, result.AccessToken, result.RefreshToken, result.ExpiresAt);
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"Microsoft 账户：{result.Username}"));
+                break;
+            }
+
+            case AuthMode.Authlib:
+            {
+                if (_authlib is null)
+                {
+                    throw new NotSupportedException("外置登录未注入。");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.ServerUrl) ||
+                    string.IsNullOrWhiteSpace(request.Username) ||
+                    string.IsNullOrWhiteSpace(request.Password))
+                {
+                    throw new AuthException("E6005", "外置登录需要服务器地址、用户名与密码。");
+                }
+
+                var result = await _authlib.LoginAsync(
+                    request.ServerUrl, request.Username, request.Password, ct);
+                account = new StoredAccount(
+                    $"authlib:{result.Uuid}@{new Uri(result.ServerUrl).Host}", AuthMode.Authlib,
+                    result.Username, result.Uuid, AvatarUrl: null, result.AccessToken,
+                    RefreshToken: null, ExpiresAt: null, result.ServerUrl, result.ClientToken);
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"外置账户：{result.Username}"));
+                break;
+            }
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(request), request.Mode, "未知的登录方式。");
+        }
+
+        _accounts.Upsert(account);
+        _accounts.SetActive(account.Id);
+        _logger.LogInformation("账户已登录：{Type} {Username}", account.Type, account.Username);
+        return ToSummary(account, isActive: true);
     }
 
-    public Task LogoutAsync(string accountId, CancellationToken ct) => Task.CompletedTask;
-
-    public Task SetActiveAccountAsync(string accountId, CancellationToken ct) => Task.CompletedTask;
-
-    public Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct)
+    public Task LogoutAsync(string accountId, CancellationToken ct)
     {
-        var dir = ModsDir(instanceId);
-        if (!Directory.Exists(dir))
+        if (_accounts is null)
         {
-            return Task.FromResult<IReadOnlyList<ModEntry>>(Array.Empty<ModEntry>());
+            return Task.CompletedTask;
         }
 
-        var mods = new List<ModEntry>();
-        foreach (var file in Directory.EnumerateFiles(dir, "*.jar*"))
+        _accounts.Remove(accountId);
+        _logger.LogInformation("账户已移除：{AccountId}", accountId);
+        return Task.CompletedTask;
+    }
+
+    public Task SetActiveAccountAsync(string accountId, CancellationToken ct)
+    {
+        _accounts?.SetActive(accountId);
+        return Task.CompletedTask;
+    }
+
+    private static AccountSummary ToSummary(StoredAccount account, bool isActive) =>
+        new(account.Id, account.Type, account.Username, account.Uuid, account.AvatarUrl, isActive, account.ExpiresAt);
+
+    public async Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct)
+    {
+        var (instance, gameDir) = await FindInstanceAsync(instanceId, ct);
+        var modsDir = Path.Combine(gameDir, "mods");
+        return ModScanner.Scan(gameDir, instance.Loader)
+            .Select(m => m.IconPath is null
+                ? m with
+                {
+                    IconPath = TryExtractIcon(
+                        m.FileName.Replace(".jar.disabled", string.Empty, StringComparison.OrdinalIgnoreCase),
+                        Path.Combine(modsDir, m.FileName),
+                        iconEntry: null),
+                }
+                : m)
+            .ToArray();
+    }
+
+    public async Task SetModEnabledAsync(
+        string instanceId, string modId, bool enabled, CancellationToken ct)
+    {
+        var (_, gameDir) = await FindInstanceAsync(instanceId, ct);
+        if (!ModScanner.SetEnabled(gameDir, modId, enabled))
         {
-            var fileName = Path.GetFileName(file);
-            var enabled = !fileName.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase);
-            var baseName = enabled ? fileName : fileName[..^".disabled".Length];
-
-            var meta = ReadModMeta(file);
-            var modId = meta.Id ?? baseName;
-            var name = meta.Name ?? Path.GetFileNameWithoutExtension(baseName);
-
-            mods.Add(new ModEntry(
-                Id: modId,
-                Name: name,
-                Version: meta.Version,
-                FileName: fileName,
-                Enabled: enabled,
-                Loader: LoaderKind.Vanilla,
-                Dependencies: Array.Empty<string>(),
-                IconPath: TryExtractIcon(baseName, file, meta.IconEntry)));
+            throw new KeyNotFoundException($"模组不存在：{modId}");
         }
-
-        return Task.FromResult<IReadOnlyList<ModEntry>>(mods);
     }
 
     /// <summary>把外部 jar 复制到实例的 mods 目录。</summary>
-    public Task ImportModAsync(string instanceId, string sourceJarPath, CancellationToken ct)
+    public async Task ImportModAsync(string instanceId, string sourceJarPath, CancellationToken ct)
     {
-        var dir = ModsDir(instanceId);
+        var dir = await ModsDir(instanceId, ct);
         Directory.CreateDirectory(dir);
         File.Copy(sourceJarPath, Path.Combine(dir, Path.GetFileName(sourceJarPath)), overwrite: true);
-        return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<OnlineModSummary>> SearchOnlineModsAsync(
@@ -304,13 +430,16 @@ public sealed class LauncherFacade : ILauncherFacade
             ? _curseForge.SearchAsync(query, loader, gameVersion, page, ct)
             : _modrinth.SearchAsync(query, modCategory, ModrinthClient.LoaderName(loader), gameVersion, page, ct);
 
-    public Task<string> InstallOnlineModAsync(
+    public async Task<string> InstallOnlineModAsync(
         string instanceId, ModSource source, string projectId, string? gameVersion, LoaderKind loader,
-        IProgress<InstallProgress> progress, CancellationToken ct) =>
-        source == ModSource.CurseForge
-            ? _curseForge.InstallAsync(ModsDir(instanceId), projectId, gameVersion, loader, progress, ct)
-            : _modrinth.InstallAsync(
-                ModsDir(instanceId), projectId, gameVersion, ModrinthClient.LoaderName(loader), progress, ct);
+        IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        var modsDir = await ModsDir(instanceId, ct);
+        return source == ModSource.CurseForge
+            ? await _curseForge.InstallAsync(modsDir, projectId, gameVersion, loader, progress, ct)
+            : await _modrinth.InstallAsync(
+                modsDir, projectId, gameVersion, ModrinthClient.LoaderName(loader), progress, ct);
+    }
 
     /// <summary>读取 Fabric 元数据（id / 名称 / 版本 / 图标入口），非 Fabric 模组返回全空。</summary>
     private static (string? Id, string? Name, string? Version, string? IconEntry) ReadModMeta(string jarPath)
@@ -381,37 +510,24 @@ public sealed class LauncherFacade : ILauncherFacade
         }
     }
 
-    public Task SetModEnabledAsync(string instanceId, string modId, bool enabled, CancellationToken ct)
+    public async Task DeleteModAsync(string instanceId, string modId, CancellationToken ct)
     {
-        var path = FindModFile(instanceId, modId)
-            ?? throw new FileNotFoundException($"模组不存在：{modId}");
-
-        var currentlyEnabled = !path.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase);
-        if (currentlyEnabled == enabled)
-        {
-            return Task.CompletedTask;
-        }
-
-        var target = enabled ? path[..^".disabled".Length] : path + ".disabled";
-        File.Move(path, target);
-        return Task.CompletedTask;
-    }
-
-    public Task DeleteModAsync(string instanceId, string modId, CancellationToken ct)
-    {
-        var path = FindModFile(instanceId, modId)
+        var path = await FindModFile(instanceId, modId, ct)
             ?? throw new FileNotFoundException($"模组不存在：{modId}");
 
         File.Delete(path);
-        return Task.CompletedTask;
     }
 
-    private string ModsDir(string instanceId) => Path.Combine(_paths.InstancesDir, instanceId, "mods");
+    private async Task<string> ModsDir(string instanceId, CancellationToken ct)
+    {
+        var (_, gameDir) = await FindInstanceAsync(instanceId, ct);
+        return Path.Combine(gameDir, "mods");
+    }
 
     /// <summary>按模组 Id（Fabric id 或文件名）定位已安装的 jar。</summary>
-    private string? FindModFile(string instanceId, string modId)
+    private async Task<string?> FindModFile(string instanceId, string modId, CancellationToken ct)
     {
-        var dir = ModsDir(instanceId);
+        var dir = await ModsDir(instanceId, ct);
         if (!Directory.Exists(dir))
         {
             return null;
@@ -440,13 +556,117 @@ public sealed class LauncherFacade : ILauncherFacade
 
     public async Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct)
     {
-        await Task.CompletedTask;
-        throw new NotSupportedException("M0 未实现实例删除。");
+        var (instance, gameDir) = await FindInstanceAsync(instanceId, ct);
+
+        if (_launcher is not null)
+        {
+            var running = await _launcher.GetRunningSessionsAsync(ct);
+            if (running.Any(r => string.Equals(r.InstanceId, instanceId, StringComparison.Ordinal)))
+            {
+                throw new InvalidOperationException("实例正在运行，请先停止游戏再删除。");
+            }
+        }
+
+        if (keepSaves && Directory.Exists(gameDir))
+        {
+            var exportRoot = Path.Combine(
+                _paths.ExportsDir, $"{instanceId}-{DateTimeOffset.Now:yyyyMMdd-HHmmss}");
+            foreach (var sub in new[] { "saves", "screenshots" })
+            {
+                var source = Path.Combine(gameDir, sub);
+                if (!Directory.Exists(source))
+                {
+                    continue;
+                }
+
+                var target = Path.Combine(exportRoot, sub);
+                Directory.CreateDirectory(exportRoot);
+                try
+                {
+                    Directory.Move(source, target);
+                }
+                catch (IOException)
+                {
+                    CopyDirectory(source, target);
+                    Directory.Delete(source, recursive: true);
+                }
+            }
+        }
+
+        // 只删除由本启动器管理的实例目录；外部接管与 shared/game 一律不动。
+        if (IsManagedInstanceDir(gameDir) && Directory.Exists(gameDir))
+        {
+            Directory.Delete(gameDir, recursive: true);
+        }
+
+        await _sqlite.DeleteInstanceAsync(instance.Id, ct);
+        _logger.LogInformation("实例已删除：{Instance}（keepSaves={KeepSaves}）", instanceId, keepSaves);
     }
 
-    public Task<IReadOnlyList<InstanceSummary>> ImportExternalAsync(
-        string path, IProgress<ImportProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现外部导入。");
+    public async Task<IReadOnlyList<InstanceSummary>> ImportExternalAsync(
+        string path, IProgress<ImportProgress> progress, CancellationToken ct)
+    {
+        var candidate = ExternalImporter.Detect(path);
+        progress.Report(new ImportProgress("detect", 0, 0, 0, candidate.SourceKind));
+        var instanceId = await ExternalImporter.CopyAsync(
+            candidate, _paths, candidate.Name, progress, ct);
+
+        var name = string.IsNullOrWhiteSpace(candidate.Name) ? instanceId : candidate.Name;
+        await _sqlite.UpsertInstanceAsync(
+            instanceId, name, Path.Combine(_paths.InstancesDir, instanceId),
+            candidate.GameVersion, candidate.Loader, candidate.LoaderVersion,
+            IsolationLevel.ModsConfig, InstanceState.Ready, ct: ct);
+
+        _logger.LogInformation("外部实例已导入：{Source} -> {Instance}", candidate.SourceKind, instanceId);
+        return
+        [
+            new InstanceSummary(
+                instanceId, name, candidate.GameVersion, candidate.Loader, candidate.LoaderVersion,
+                IsolationLevel.ModsConfig, InstanceState.Ready, null, null),
+        ];
+    }
+
+    private async Task<(InstanceSummary Instance, string GameDir)> FindInstanceAsync(
+        string instanceId, CancellationToken ct)
+    {
+        var instances = await _sqlite.GetInstancesAsync(ct);
+        var instance = instances.FirstOrDefault(i => i.Id == instanceId)
+            ?? throw new KeyNotFoundException($"实例不存在：{instanceId}");
+        return (instance, await ResolveGameDirAsync(instance, ct));
+    }
+
+    private async Task<string> ResolveGameDirAsync(InstanceSummary instance, CancellationToken ct)
+    {
+        var root = await _sqlite.GetRootPathAsync(instance.Id, ct);
+        if (!string.IsNullOrWhiteSpace(root))
+        {
+            return root;
+        }
+
+        return instance.Isolation == IsolationLevel.None
+            ? Path.Combine(_paths.SharedDir, "game")
+            : Path.Combine(_paths.InstancesDir, instance.Id);
+    }
+
+    private bool IsManagedInstanceDir(string path)
+    {
+        var root = Path.GetFullPath(_paths.InstancesDir)
+            .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(source, file);
+            var destination = Path.Combine(target, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination, overwrite: true);
+        }
+    }
 
     public Task UpdateSettingsAsync(AppSettingsPatch patch, CancellationToken ct)
     {
@@ -467,11 +687,28 @@ public sealed class LauncherFacade : ILauncherFacade
         return Task.CompletedTask;
     }
 
-    public Task<UpdateInfo?> CheckUpdateAsync(CancellationToken ct) =>
-        Task.FromResult<UpdateInfo?>(null);
+    public async Task<UpdateInfo?> CheckUpdateAsync(CancellationToken ct) =>
+        await _update.CheckAsync(ct: ct);
+
+    /// <summary>CLI 入口：指定通道与是否允许降级（不在 UI 契约内）。</summary>
+    public Task<UpdateInfo?> CheckUpdateAsync(string? channel, bool force, CancellationToken ct) =>
+        _update.CheckAsync(channel, force, ct);
 
     public Task ApplyUpdateAsync(UpdateInfo info, IProgress<UpdateProgress> progress, CancellationToken ct) =>
-        throw new NotSupportedException("M0 未实现自动更新。");
+        _update.ApplyAsync(info, progress, ct);
+
+    public async Task<IntegrityReport> VerifyIntegrityAsync(IntegrityCheckMode mode, CancellationToken ct)
+    {
+        try
+        {
+            return await _integrity.VerifyAsync(mode, ct: ct);
+        }
+        catch (IntegrityException ex)
+        {
+            return new IntegrityReport(
+                false, mode, 0, ex.FailedFiles, ex.Message, DateTimeOffset.Now);
+        }
+    }
 
     public Task<IReadOnlyList<LogFileInfo>> GetLogFilesAsync(string? instanceId, CancellationToken ct)
     {
@@ -490,33 +727,6 @@ public sealed class LauncherFacade : ILauncherFacade
         return Task.FromResult<IReadOnlyList<LogFileInfo>>(files);
     }
 
-    public Task<string> ExportDiagnosticsAsync(string? instanceId, CancellationToken ct)
-    {
-        Directory.CreateDirectory(_paths.ExportsDir);
-        var output = Path.Combine(
-            _paths.ExportsDir,
-            $"diagnostics-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.zip");
-
-        using var archive = ZipFile.Open(output, ZipArchiveMode.Create);
-        AddEntryIfExists(archive, _paths.ConfigFile, "launcher.json");
-        foreach (var log in Directory.Exists(_paths.LogsDir)
-                     ? Directory.GetFiles(_paths.LogsDir, "*.log")
-                     : Array.Empty<string>())
-        {
-            AddEntryIfExists(archive, log, $"logs/{Path.GetFileName(log)}");
-        }
-
-        archive.CreateEntry("README.txt");
-        return Task.FromResult(output);
-    }
-
-    private static void AddEntryIfExists(ZipArchive archive, string path, string entryName)
-    {
-        if (!File.Exists(path))
-        {
-            return;
-        }
-
-        archive.CreateEntryFromFile(path, entryName, CompressionLevel.Optimal);
-    }
+    public Task<string> ExportDiagnosticsAsync(string? instanceId, CancellationToken ct) =>
+        _diagnostics.ExportAsync(instanceId, ct);
 }

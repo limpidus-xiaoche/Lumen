@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: ['feat/**']
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: windows-latest
+    env:
+      AVALONIA_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 还原
+        run: dotnet restore Launcher.slnx
+
+      - name: 格式检查
+        run: dotnet format whitespace Launcher.slnx --verify-no-changes --no-restore
+
+      - name: 构建（0 警告）
+        run: dotnet build Launcher.slnx -warnaserror --no-restore
+
+      - name: 测试
+        run: dotnet test Launcher.slnx --no-build
+
+      - name: 文档检查
+        shell: pwsh
+        run: ./scripts/docs-lint.ps1

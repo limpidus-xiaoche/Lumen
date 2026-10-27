@@ -4,10 +4,12 @@
     <Project Path="src/Launcher.Cli/Launcher.Cli.csproj" />
     <Project Path="src/Launcher.Core/Launcher.Core.csproj" />
     <Project Path="src/Launcher.Protocol/Launcher.Protocol.csproj" />
+    <Project Path="src/Launcher.Render/Launcher.Render.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Launcher.App.Tests/Launcher.App.Tests.csproj" />
     <Project Path="tests/Launcher.Core.Tests/Launcher.Core.Tests.csproj" />
     <Project Path="tests/Launcher.Integration.Tests/Launcher.Integration.Tests.csproj" />
+    <Project Path="tests/Launcher.Render.Tests/Launcher.Render.Tests.csproj" />
   </Folder>
 </Solution>

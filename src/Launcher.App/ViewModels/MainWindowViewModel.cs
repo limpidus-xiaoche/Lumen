@@ -11,7 +11,9 @@ public sealed record NavItem(string Title, object ViewModel, IconKind Icon);
 
 public partial class MainWindowViewModel : ObservableObject
 {
-    private readonly ILauncherFacade _facade;
+    /// <summary>沉浸式 Shell（S1）直接取门面读取实例列表。</summary>
+    public ILauncherFacade Facade { get; }
+
     private readonly InstancesViewModel _instances;
     private readonly LogsViewModel _logs;
     private readonly MoreViewModel _more;
@@ -31,7 +33,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel(ILauncherFacade facade, string logsDir)
     {
-        _facade = facade;
+        Facade = facade;
 
         var runLog = new RunLogStore();
 
