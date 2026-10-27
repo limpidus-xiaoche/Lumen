@@ -354,7 +354,7 @@ public class SkinPreview : Control
         }
 
         var leftArm = NewPart(pivotY: 24, swing: 1);
-        AddBox(leftArm, Crop, legacy ? 40 : 48, legacy ? 16 : 48, 4, 12, 4, 4, 8, 12, 24, -2, 2, mirrorTexture: legacy);
+        AddBox(leftArm, Crop, legacy ? 40 : 32, legacy ? 16 : 48, 4, 12, 4, 4, 8, 12, 24, -2, 2, mirrorTexture: legacy);
         if (!legacy)
         {
             AddBox(leftArm, Crop, 48, 48, 4, 12, 4, 3.65, 8.35, 11.65, 24.35, -2.35, 2.35, mirrorTexture: false);

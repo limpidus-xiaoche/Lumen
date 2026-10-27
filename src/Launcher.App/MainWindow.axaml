@@ -1,16 +1,383 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:shell="using:Launcher.App.Shell"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
+        xmlns:views="using:Launcher.App.Views"
         x:Class="Launcher.App.MainWindow"
         Title="Lumen"
+        Width="820"
+        Height="560"
+        MinWidth="700"
+        MinHeight="480"
         WindowStartupLocation="CenterScreen"
-        WindowState="FullScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="52"
         WindowDecorations="None"
-        CanResize="False"
-        Background="#05030A">
-  <!-- 默认沉浸式 Shell；F2 或左上角「经典视图」按钮切换到 ClassicShell（PCL 风格布局）。 -->
-  <Grid>
-    <shell:ImmersiveShell x:Name="Immersive" />
-    <shell:ClassicShell x:Name="Classic" IsVisible="False" />
+        Background="{DynamicResource WindowBackground}">
+  <Window.Styles>
+    <!-- 账号区登录方式 pill（离线/正版）：选中项青色高亮 -->
+    <Style Selector="RadioButton.mode-pill">
+      <Setter Property="Padding" Value="18,8" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border Background="{TemplateBinding Background}"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                Foreground="{TemplateBinding Foreground}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.mode-pill:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="RadioButton.mode-pill:checked">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- 自定义标题栏窗口控制按钮 -->
+    <Style Selector="Button.win-btn">
+      <Setter Property="Width" Value="44" />
+      <Setter Property="Height" Value="52" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="{TemplateBinding Background}">
+              <ContentPresenter Content="{TemplateBinding Content}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="Button.win-btn:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+    </Style>
+    <Style Selector="Button.win-btn-close:pointerover">
+      <Setter Property="Background" Value="#C42B1C" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- 侧栏底部图标按钮（任务 / 更多）：点击回弹动画 -->
+    <Style Selector="Button.nav-icon">
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Padding" Value="0,14" />
+      <Setter Property="Margin" Value="4,6" />
+      <Setter Property="MinHeight" Value="56" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+      <Setter Property="RenderTransform">
+        <ScaleTransform />
+      </Setter>
+    </Style>
+
+    <!-- 导航图标点击动效：末影人生气抖动 / 潜影贝上浮 -->
+    <Style Selector="views|MinecraftPixelIcon">
+      <Setter Property="RenderTransform">
+        <TranslateTransform />
+      </Setter>
+    </Style>
+    <Style Selector="views|MinecraftPixelIcon.angry">
+      <Style.Animations>
+        <Animation Duration="0:0:0.62" Easing="CubicEaseOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="TranslateTransform.X" Value="0" />
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+          <KeyFrame Cue="12%">
+            <Setter Property="TranslateTransform.X" Value="-3" />
+            <Setter Property="TranslateTransform.Y" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="24%">
+            <Setter Property="TranslateTransform.X" Value="3" />
+            <Setter Property="TranslateTransform.Y" Value="-1" />
+          </KeyFrame>
+          <KeyFrame Cue="36%">
+            <Setter Property="TranslateTransform.X" Value="-2" />
+            <Setter Property="TranslateTransform.Y" Value="2" />
+          </KeyFrame>
+          <KeyFrame Cue="48%">
+            <Setter Property="TranslateTransform.X" Value="2" />
+            <Setter Property="TranslateTransform.Y" Value="-2" />
+          </KeyFrame>
+          <KeyFrame Cue="62%">
+            <Setter Property="TranslateTransform.X" Value="-1" />
+            <Setter Property="TranslateTransform.Y" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="TranslateTransform.X" Value="0" />
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="views|MinecraftPixelIcon.hop">
+      <Style.Animations>
+        <Animation Duration="0:0:0.42" Easing="CubicEaseOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+          <KeyFrame Cue="35%">
+            <Setter Property="TranslateTransform.Y" Value="-5" />
+          </KeyFrame>
+          <KeyFrame Cue="70%">
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+          <KeyFrame Cue="85%">
+            <Setter Property="TranslateTransform.Y" Value="-1.5" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="TranslateTransform.Y" Value="0" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="Button.nav-icon:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="Button.nav-icon:pressed">
+      <Style.Animations>
+        <Animation Duration="0:0:0.16" Easing="CubicEaseOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="ScaleTransform.ScaleX" Value="1" />
+            <Setter Property="ScaleTransform.ScaleY" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="45%">
+            <Setter Property="ScaleTransform.ScaleX" Value="0.93" />
+            <Setter Property="ScaleTransform.ScaleY" Value="0.93" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="ScaleTransform.ScaleX" Value="1" />
+            <Setter Property="ScaleTransform.ScaleY" Value="1" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="52,*">
+
+    <!-- 自定义标题栏（PCL2 风格：无系统标题栏，Logo 居左，账号区+关闭按钮居右） -->
+    <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="0,0,0,1"
+            chrome:WindowDecorationProperties.ElementRole="TitleBar">
+      <DockPanel LastChildFill="False">
+
+        <!-- 左侧：方形皮肤头像（未登录为默认皮肤） + 品牌标识 -->
+        <StackPanel DockPanel.Dock="Left" Margin="14,0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+          <Border Width="32" Height="32" CornerRadius="5"
+                  ClipToBounds="True"
+                  VerticalAlignment="Center"
+                  Background="#3A2A57"
+                  BorderBrush="#66C9A7FF"
+                  BorderThickness="1">
+            <Image Source="{Binding Accounts.Avatar}"
+                   RenderOptions.BitmapInterpolationMode="None"
+                   Stretch="UniformToFill" />
+          </Border>
+          <StackPanel VerticalAlignment="Center" Spacing="-2">
+            <TextBlock Text="LMD Launcher" FontSize="16" FontWeight="Bold"
+                       Foreground="{DynamicResource AccentGlow}" />
+            <TextBlock Text="启动器" FontSize="11" FontWeight="Medium"
+                       Foreground="{DynamicResource TextSecondary}" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- 右侧：最小化 + 关闭按钮 -->
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="0">
+          <Button x:Name="BtnMin" Classes="win-btn" Content="─"
+                  chrome:WindowDecorationProperties.ElementRole="DecorationsElement" />
+          <Button x:Name="BtnClose" Classes="win-btn win-btn-close" Content="×"
+                  chrome:WindowDecorationProperties.ElementRole="DecorationsElement" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- 主区：左侧导航 + 右侧页面 -->
+    <Grid Grid.Row="1" ColumnDefinitions="172,*">
+
+      <!-- 左侧导航栏（PCL2 风格：竖排大按钮） -->
+      <Border Grid.Column="0" Background="{DynamicResource SidebarBackground}">
+        <DockPanel>
+          <!-- 三大导航按钮：启动 / 下载 / 设置 -->
+          <ListBox x:Name="NavList"
+                   DockPanel.Dock="Top"
+                   Margin="10,26,10,0"
+                   ItemsSource="{Binding Pages}"
+                   SelectedItem="{Binding SelectedPage}"
+                   Background="Transparent"
+                   BorderThickness="0">
+            <ListBox.ItemContainerTheme>
+              <ControlTheme TargetType="ListBoxItem">
+                <Setter Property="Padding" Value="0,14" />
+                <Setter Property="Margin" Value="4,6" />
+                <Setter Property="FontSize" Value="17" />
+                <Setter Property="MinHeight" Value="56" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+                <Setter Property="RenderTransform">
+                  <ScaleTransform />
+                </Setter>
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                      <Border Background="{TemplateBinding Background}"
+                              CornerRadius="{TemplateBinding CornerRadius}"
+                              Padding="{TemplateBinding Padding}"
+                              BorderBrush="{DynamicResource AccentBrush}"
+                              BorderThickness="0">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                      </Border>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+                <Style Selector="^:pointerover">
+                  <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+                </Style>
+                <Style Selector="^:selected">
+                  <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+                  <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+                  <Setter Property="FontWeight" Value="SemiBold" />
+                  <!-- 点击选中时图标轻微回弹 -->
+                  <Style.Animations>
+                    <Animation Duration="0:0:0.26" Easing="CubicEaseOut">
+                      <KeyFrame Cue="0%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                      </KeyFrame>
+                      <KeyFrame Cue="55%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1.06" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1.06" />
+                      </KeyFrame>
+                      <KeyFrame Cue="100%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                      </KeyFrame>
+                    </Animation>
+                  </Style.Animations>
+                </Style>
+                <Style Selector="^:pressed">
+                  <Style.Animations>
+                    <Animation Duration="0:0:0.16" Easing="CubicEaseOut">
+                      <KeyFrame Cue="0%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                      </KeyFrame>
+                      <KeyFrame Cue="45%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="0.93" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="0.93" />
+                      </KeyFrame>
+                      <KeyFrame Cue="100%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                      </KeyFrame>
+                    </Animation>
+                  </Style.Animations>
+                </Style>
+              </ControlTheme>
+            </ListBox.ItemContainerTheme>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Panel ToolTip.Tip="{Binding Title}" Width="52" Height="44">
+                  <!-- 原版物品栏式底槽，让深色图标在暗色侧栏上也有足够对比 -->
+                  <Border Width="42" Height="42"
+                          CornerRadius="9"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Background="#241A33"
+                          BorderBrush="#4A3A63"
+                          BorderThickness="1" />
+                  <views:MinecraftPixelIcon Kind="{Binding Icon}"
+                                            Width="32" Height="32"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center" />
+                </Panel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <!-- 底部：任务中心 / 更多入口 + 版本信息 -->
+          <StackPanel DockPanel.Dock="Bottom" Margin="10,0,10,16" Spacing="4">
+            <Button Classes="nav-icon"
+                    x:Name="BtnTasks"
+                    Command="{Binding ShowTasksCommand}"
+                    HorizontalAlignment="Stretch"
+                    ToolTip.Tip="任务">
+              <Panel Width="52" Height="44">
+                <Border Width="42" Height="42" CornerRadius="9"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="#241A33" BorderBrush="#4A3A63" BorderThickness="1" />
+                <views:MinecraftPixelIcon Kind="EnchantedBook" Width="32" Height="32"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Panel>
+            </Button>
+
+            <Button Classes="nav-icon"
+                    x:Name="BtnMore"
+                    Command="{Binding ShowMoreCommand}"
+                    HorizontalAlignment="Stretch"
+                    ToolTip.Tip="更多">
+              <Panel Width="52" Height="44">
+                <Border Width="42" Height="42" CornerRadius="9"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="#241A33" BorderBrush="#4A3A63" BorderThickness="1" />
+                <views:MinecraftPixelIcon Kind="EyeOfEnder" Width="32" Height="32"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Panel>
+            </Button>
+
+            <TextBlock Text="Lumen 0.1 · M3"
+                       Margin="26,0,0,0"
+                       FontSize="11"
+                       Opacity="0.45"
+                       Foreground="{DynamicResource TextMuted}" />
+          </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <!-- 右侧页面内容：末端影环境光 + 漂浮微粒子垫底 -->
+      <Border Grid.Column="1" Background="{DynamicResource ContentBackground}">
+        <Grid>
+          <Border Background="{DynamicResource AmbientGlow}" IsHitTestVisible="False" />
+          <views:EnderParticles Opacity="0.55" IsHitTestVisible="False" />
+          <ContentControl Content="{Binding CurrentPage}" Margin="8" />
+        </Grid>
+      </Border>
+    </Grid>
   </Grid>
 </Window>
