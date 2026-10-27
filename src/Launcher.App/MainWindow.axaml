@@ -80,6 +80,25 @@
       <Setter Property="Foreground" Value="White" />
     </Style>
 
+    <!-- 标题栏方形头像：点击进入账户页 -->
+    <Style Selector="Button.avatar-hit">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <ContentPresenter Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="Button.avatar-hit:pointerover">
+      <Setter Property="Opacity" Value="0.82" />
+    </Style>
+
     <!-- 侧栏底部图标按钮（任务 / 更多）：点击回弹动画 -->
     <Style Selector="Button.nav-icon">
       <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -191,16 +210,20 @@
 
         <!-- 左侧：方形皮肤头像（未登录为默认皮肤） + 品牌标识 -->
         <StackPanel DockPanel.Dock="Left" Margin="14,0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-          <Border Width="32" Height="32" CornerRadius="5"
-                  ClipToBounds="True"
+          <Button Classes="avatar-hit"
+                  Command="{Binding ShowAccountsCommand}"
                   VerticalAlignment="Center"
-                  Background="#3A2A57"
-                  BorderBrush="#66C9A7FF"
-                  BorderThickness="1">
-            <Image Source="{Binding Accounts.Avatar}"
-                   RenderOptions.BitmapInterpolationMode="None"
-                   Stretch="UniformToFill" />
-          </Border>
+                  ToolTip.Tip="账户">
+            <Border Width="32" Height="32" CornerRadius="5"
+                    ClipToBounds="True"
+                    Background="#3A2A57"
+                    BorderBrush="#66C9A7FF"
+                    BorderThickness="1">
+              <Image Source="{Binding Accounts.Avatar}"
+                     RenderOptions.BitmapInterpolationMode="None"
+                     Stretch="UniformToFill" />
+            </Border>
+          </Button>
           <StackPanel VerticalAlignment="Center" Spacing="-2">
             <TextBlock Text="LMD Launcher" FontSize="16" FontWeight="Bold"
                        Foreground="{DynamicResource AccentGlow}" />
@@ -361,7 +384,7 @@
               </Panel>
             </Button>
 
-            <TextBlock Text="Lumen 0.1 · M3"
+            <TextBlock Text="Lumen 0.1 · M4"
                        Margin="26,0,0,0"
                        FontSize="11"
                        Opacity="0.45"

@@ -1,10 +1,321 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Launcher.App.Views.AccountsView">
-  <StackPanel Margin="28" Spacing="12">
-    <TextBlock Text="账户" FontSize="26" FontWeight="Bold" />
-    <TextBox Text="{Binding Username}" PlaceholderText="离线用户名" Width="260" HorizontalAlignment="Left" />
-    <Button Content="离线登录" Command="{Binding LoginOfflineCommand}" />
-    <TextBlock Text="{Binding StatusText}" />
-  </StackPanel>
+  <UserControl.Styles>
+    <!-- 卡片：与启动页一致的毛玻璃面板 -->
+    <Style Selector="Border.panel">
+      <Setter Property="Background" Value="{DynamicResource GlassBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GlassBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="BoxShadow" Value="0 14 40 0 #52000000" />
+    </Style>
+
+    <!-- 次级按钮 -->
+    <Style Selector="Button.ghost">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GlassBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ghost:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+    <Style Selector="Button.ghost.mini">
+      <Setter Property="Height" Value="26" />
+      <Setter Property="Padding" Value="9,0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector="Button.ghost.danger">
+      <Setter Property="Foreground" Value="#FF8C84" />
+      <Setter Property="BorderBrush" Value="#66FF7B72" />
+    </Style>
+    <Style Selector="Button.ghost.danger:pointerover">
+      <Setter Property="Background" Value="#33FF7B72" />
+      <Setter Property="Foreground" Value="#FFB4AD" />
+    </Style>
+
+    <!-- 主按钮 -->
+    <Style Selector="Button.primary">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="18,0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="#F6F0FF" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="#B48CFF" />
+    </Style>
+    <Style Selector="Button.primary:pressed">
+      <Setter Property="Opacity" Value="0.9" />
+    </Style>
+    <Style Selector="Button.primary:disabled">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <!-- 登录方式 pill -->
+    <Style Selector="RadioButton.pill">
+      <Setter Property="Padding" Value="14,5" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border Background="{TemplateBinding Background}"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.pill:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="RadioButton.pill:checked">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- 账户列表行 -->
+    <Style Selector="Border.account-row">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="#80241A33" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.account-row.active">
+      <Setter Property="Background" Value="#A52E1F4D" />
+      <Setter Property="BorderBrush" Value="#73A275F5" />
+    </Style>
+
+    <!-- 类型标签 -->
+    <Style Selector="Border.tag">
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.tag TextBlock">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+
+    <!-- 设备码面板 -->
+    <Style Selector="Border.device">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="#66120E18" />
+      <Setter Property="BorderBrush" Value="#33A275F5" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="12,11" />
+    </Style>
+
+    <!-- 输入框：统一暗紫底，避免 Fluent 默认灰底 -->
+    <Style Selector="TextBox">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="{DynamicResource CardBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GlassBorder}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid Margin="26,20,30,22" ColumnDefinitions="252,*" ColumnSpacing="16">
+
+    <!-- 左：账户列表 -->
+    <Border Grid.Column="0" Classes="panel" Padding="12,14">
+      <Grid RowDefinitions="Auto,*" RowSpacing="10">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+          <StackPanel Spacing="2">
+            <TextBlock Text="账户" FontSize="18" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimary}" />
+            <TextBlock Text="{Binding AccountCountText}" FontSize="11"
+                       Foreground="{DynamicResource TextSecondary}" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="ghost mini" Content="刷新"
+                  Command="{Binding RefreshCommand}" VerticalAlignment="Center" />
+        </Grid>
+
+        <ScrollViewer Grid.Row="1">
+          <StackPanel Spacing="8">
+            <TextBlock Text="还没有账户，右侧选择一种方式登录"
+                       IsVisible="{Binding IsEmpty}"
+                       FontSize="11" TextWrapping="Wrap" Margin="2,10,2,0"
+                       Foreground="{DynamicResource TextMuted}" />
+
+            <ItemsControl ItemsSource="{Binding Items}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Classes="account-row"
+                          Classes.active="{Binding IsActive}"
+                          Padding="10,9" Margin="0,0,0,8">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                      <Border Width="38" Height="38" CornerRadius="5"
+                              ClipToBounds="True" Background="#241634"
+                              BorderBrush="#40A275F5" BorderThickness="1"
+                              VerticalAlignment="Center">
+                        <Image Source="{Binding $parent[UserControl].DataContext.Avatar}"
+                               RenderOptions.BitmapInterpolationMode="None"
+                               Stretch="UniformToFill" />
+                      </Border>
+
+                      <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Username}" FontSize="13"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <Border Classes="tag">
+                            <TextBlock Text="{Binding TypeText}" />
+                          </Border>
+                          <TextBlock Text="{Binding ActiveText}"
+                                     IsVisible="{Binding IsActive}"
+                                     FontSize="10" VerticalAlignment="Center"
+                                     Foreground="{DynamicResource AccentGlow}" />
+                        </StackPanel>
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+                        <Button Content="设为当前" Classes="ghost mini"
+                                Command="{Binding ActivateCommand}"
+                                IsVisible="{Binding CanActivate}"
+                                IsEnabled="{Binding !IsBusy}" />
+                        <Button Content="删除" Classes="ghost mini danger"
+                                Command="{Binding RemoveCommand}"
+                                IsEnabled="{Binding !IsBusy}" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Border>
+
+    <!-- 右：登录方式 -->
+    <Border Grid.Column="1" Classes="panel" Padding="18,16">
+      <Grid RowDefinitions="Auto,Auto,*" RowSpacing="14">
+
+        <StackPanel Grid.Row="0" Spacing="8">
+          <TextBlock Text="登录账户" FontSize="16" FontWeight="Bold"
+                     Foreground="{DynamicResource TextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <RadioButton Classes="pill" GroupName="AccountsAuthMode" Content="离线"
+                         IsChecked="{Binding OfflineMode}" />
+            <RadioButton Classes="pill" GroupName="AccountsAuthMode" Content="微软"
+                         IsChecked="{Binding MicrosoftMode}" />
+            <RadioButton Classes="pill" GroupName="AccountsAuthMode" Content="外置"
+                         IsChecked="{Binding AuthlibMode}" />
+          </StackPanel>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+
+          <!-- 离线登录 -->
+          <StackPanel IsVisible="{Binding IsOfflineForm}" Spacing="10">
+            <TextBlock Text="离线账户仅用于单机或局域网，用户名可自定义。"
+                       FontSize="11" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextMuted}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding OfflineUsername}" PlaceholderText="用户名（留空为 Player）" />
+              <Button Grid.Column="1" Classes="primary" Content="登录"
+                      Command="{Binding LoginOfflineCommand}"
+                      IsEnabled="{Binding !IsLoggingIn}" />
+            </Grid>
+          </StackPanel>
+
+          <!-- 微软设备码登录 -->
+          <StackPanel IsVisible="{Binding IsMicrosoftForm}" Spacing="10">
+            <TextBlock Text="微软账户使用设备码登录：本机不会接触你的密码。"
+                       FontSize="11" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextMuted}" />
+            <Button Classes="primary" Content="开始微软登录"
+                    Command="{Binding LoginMicrosoftCommand}"
+                    IsEnabled="{Binding !IsLoggingIn}"
+                    HorizontalAlignment="Left" />
+
+            <Border Classes="device" IsVisible="{Binding HasDeviceCode}">
+              <StackPanel Spacing="7">
+                <TextBlock Text="在浏览器中打开链接，输入下面的设备代码："
+                           FontSize="10" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextSecondary}" />
+                <SelectableTextBlock Text="{Binding DeviceVerificationUrl}"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource AccentGlow}" />
+                <TextBlock Text="{Binding DeviceUserCode}"
+                           FontSize="26" FontWeight="Bold" FontFamily="Consolas"
+                           Foreground="{DynamicResource TextPrimary}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost mini" Content="复制代码" Click="OnCopyCodeClick" />
+                  <Button Classes="ghost mini" Content="打开链接" Click="OnOpenVerifyClick" />
+                </StackPanel>
+                <TextBlock Text="{Binding DeviceMessage}" FontSize="10"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextMuted}" />
+              </StackPanel>
+            </Border>
+
+            <Button Classes="ghost" Content="取消登录"
+                    Command="{Binding CancelLoginCommand}"
+                    IsVisible="{Binding CanCancelLogin}"
+                    HorizontalAlignment="Left" />
+          </StackPanel>
+
+          <!-- 外置登录（authlib-injector） -->
+          <StackPanel IsVisible="{Binding IsAuthlibForm}" Spacing="10">
+            <TextBlock Text="外置登录：填写验证服务器地址与账户，适用于第三方验证服。"
+                       FontSize="11" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextMuted}" />
+            <TextBox Text="{Binding AuthlibServerUrl}"
+                     PlaceholderText="服务器地址，如 https://littleskin.cn/api/yggdrasil" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+              <TextBox Text="{Binding AuthlibUsername}" PlaceholderText="用户名" />
+              <TextBox Grid.Column="1" Text="{Binding AuthlibPassword}"
+                       PasswordChar="●" PlaceholderText="密码" />
+            </Grid>
+            <Button Classes="primary" Content="登录"
+                    Command="{Binding LoginAuthlibCommand}"
+                    IsEnabled="{Binding !IsLoggingIn}"
+                    HorizontalAlignment="Left" />
+          </StackPanel>
+        </Grid>
+
+        <!-- 状态与说明 -->
+        <StackPanel Grid.Row="2" VerticalAlignment="Bottom" Spacing="6">
+          <TextBlock Text="{Binding LoginStatus}" FontSize="11" TextWrapping="Wrap"
+                     Foreground="{DynamicResource TextSecondary}" />
+          <TextBlock Text="账户信息仅保存在本机，不会上传。"
+                     FontSize="10" Opacity="0.7"
+                     Foreground="{DynamicResource TextMuted}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
 </UserControl>

@@ -67,6 +67,16 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>从次级页面返回启动页。</summary>
     private void ShowHome() => CurrentPage = Pages[0].ViewModel;
 
+    /// <summary>打开账户页（标题栏头像 / 首页账号卡入口），并刷新账户列表。</summary>
+    [RelayCommand]
+    private void ShowAccounts()
+    {
+        SelectedPage = null;
+        _taskCenter.StopPolling();
+        _ = Accounts.LoadAsync();
+        CurrentPage = Accounts;
+    }
+
     /// <summary>打开任务中心（与「更多」并列的次级入口），并启动轮询。</summary>
     [RelayCommand]
     private void ShowTasks()
