@@ -129,7 +129,7 @@
         <TextBlock Text="{Binding StatusText}" FontSize="11" TextWrapping="Wrap"
                    Foreground="{DynamicResource TextMuted}" />
 
-        <!-- 加载器版本：完整版本号列表 + Fabric / Quilt 一键安装 -->
+        <!-- 加载器版本：Fabric / Forge / NeoForge 一键安装 -->
         <Border Background="{DynamicResource CardBackground}" CornerRadius="10"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12">
           <StackPanel Spacing="8">

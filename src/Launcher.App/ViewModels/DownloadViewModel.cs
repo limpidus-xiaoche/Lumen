@@ -67,8 +67,8 @@ public partial class DownloadViewModel : ObservableObject
     /// <summary>原版版本筛选：正式版 / 快照 / 全部。</summary>
     public ObservableCollection<string> VersionFilters { get; } = ["正式版", "快照", "全部"];
 
-    /// <summary>可查询的加载器（Fabric / Quilt 支持一键安装）。</summary>
-    public ObservableCollection<string> LoaderKinds { get; } = ["Fabric", "Quilt", "Forge", "NeoForge"];
+    /// <summary>可一键安装的加载器（Fabric profile 合并 / Forge、NeoForge 官方 installer）。</summary>
+    public ObservableCollection<string> LoaderKinds { get; } = ["Fabric", "Forge", "NeoForge"];
 
     /// <summary>加载器可选的原版游戏版本（正式版，最新在前）。</summary>
     public ObservableCollection<string> LoaderGameVersions { get; } = [];
@@ -153,16 +153,19 @@ public partial class DownloadViewModel : ObservableObject
     [ObservableProperty]
     private bool isLoaderBusy;
 
-    /// <summary>当前是否可以从启动器直接安装（Fabric / Quilt 使用官方 profile JSON）。</summary>
-    public bool CanInstallLoader => SelectedLoaderName is "Fabric" or "Quilt";
+    /// <summary>M5：Fabric / Forge / NeoForge 都支持从启动器直接安装。</summary>
+    public bool CanInstallLoader => SelectedLoaderName is "Fabric" or "Forge" or "NeoForge";
 
-    public string LoaderSupportText => CanInstallLoader
-        ? $"{SelectedLoaderName} 支持一键安装：自动下载 profile 与依赖库"
-        : $"{SelectedLoaderName} 可查询版本号；一键安装需官方 installer，后续阶段接入";
+    public string LoaderSupportText => SelectedLoaderName switch
+    {
+        "Fabric" => "Fabric 支持一键安装：自动下载 profile 与依赖库",
+        "Forge" => "Forge 支持一键安装：调用官方 installer 完成 headless 安装",
+        "NeoForge" => "NeoForge 支持一键安装：调用官方 installer 完成 headless 安装",
+        _ => $"{SelectedLoaderName} 暂不支持一键安装",
+    };
 
     public LoaderKind SelectedLoader => SelectedLoaderName switch
     {
-        "Quilt" => LoaderKind.Quilt,
         "Forge" => LoaderKind.Forge,
         "NeoForge" => LoaderKind.NeoForge,
         _ => LoaderKind.Fabric,
@@ -500,18 +503,12 @@ public partial class DownloadViewModel : ObservableObject
     [RelayCommand]
     private async Task ReloadLoaderVersionsAsync() => await LoadLoaderVersionsAsync();
 
-    /// <summary>安装带加载器的实例：原版 + Fabric/Quilt profile 合并后下载依赖库。</summary>
+    /// <summary>安装带加载器的实例：Fabric 合并 profile；Forge/NeoForge 调用官方 installer。</summary>
     [RelayCommand]
     private async Task InstallLoaderAsync()
     {
         if (IsInstalling)
         {
-            return;
-        }
-
-        if (!CanInstallLoader)
-        {
-            LoaderStatusText = $"{SelectedLoaderName} 暂不支持一键安装（仅可查询版本号）";
             return;
         }
 

@@ -84,6 +84,45 @@
             <TextBox Text="{Binding VersionName}" FontSize="14" />
           </StackPanel>
 
+          <!-- M5：更换加载器（原版 / Fabric / Forge / NeoForge） -->
+          <StackPanel Spacing="6">
+            <TextBlock Text="加载器" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+            <Grid ColumnDefinitions="130,*,Auto" ColumnSpacing="8">
+              <ComboBox HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding Loaders}"
+                        SelectedItem="{Binding SelectedLoader}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding Title}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                        IsVisible="{Binding !IsVanillaLoader}"
+                        ItemsSource="{Binding LoaderVersions}"
+                        SelectedItem="{Binding SelectedLoaderVersion}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding Version}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <Button Grid.Column="2" Content="更换" Command="{Binding ChangeLoaderCommand}"
+                      IsEnabled="{Binding CanSwitchLoader}"
+                      Padding="16,8" CornerRadius="8" FontSize="12" />
+            </Grid>
+            <ProgressBar IsVisible="{Binding IsLoaderBusy}"
+                         IsIndeterminate="{Binding IsLoaderIndeterminate}"
+                         Value="{Binding LoaderPercent}" Height="4" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <TextBlock Text="{Binding LoaderCurrentText}" FontSize="11"
+                         Foreground="{DynamicResource TextSecondary}" />
+              <TextBlock Text="{Binding LoaderStatusText}" FontSize="11"
+                         TextTrimming="CharacterEllipsis"
+                         Foreground="{DynamicResource TextMuted}" />
+            </StackPanel>
+          </StackPanel>
+
           <StackPanel Spacing="4">
             <TextBlock Text="游戏目录" FontSize="12" Foreground="{DynamicResource TextMuted}" />
             <TextBlock Text="{Binding GameDirText}" FontFamily="Consolas" FontSize="12"

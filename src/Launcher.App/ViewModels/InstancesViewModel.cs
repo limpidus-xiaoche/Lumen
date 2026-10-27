@@ -179,7 +179,7 @@ public partial class InstancesViewModel : ObservableObject
             return;
         }
 
-        _openSubPage(new VersionSettingsViewModel(_facade, card.Summary, _goHome));
+        _openSubPage(new VersionSettingsViewModel(_facade, card.Summary, _goHome, () => _ = LoadAsync()));
     }
 
     private void OnLaunchEvent(InstanceCardViewModel card, LaunchEvent e)
