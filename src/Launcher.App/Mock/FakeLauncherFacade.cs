@@ -28,7 +28,8 @@ public sealed class FakeLauncherFacade : ILauncherFacade
         _activeAccountId = startSignedIn ? "offline-demo" : null;
     }
 
-    private static readonly InstanceSummary[] FakeInstances =
+    private readonly object _instanceSync = new();
+    private readonly List<InstanceSummary> _instances =
     [
         new("demo-vanilla", "原版 1.21.1", "1.21.1", LoaderKind.Vanilla, null,
             IsolationLevel.ModsConfig, InstanceState.Ready, null, DateTimeOffset.Now.AddDays(-1)),
@@ -40,6 +41,7 @@ public sealed class FakeLauncherFacade : ILauncherFacade
     {
         AccountSummary[] accounts;
         string? activeId;
+        InstanceSummary[] instances;
         lock (_accountSync)
         {
             activeId = _activeAccountId;
@@ -48,9 +50,14 @@ public sealed class FakeLauncherFacade : ILauncherFacade
                 .ToArray();
         }
 
+        lock (_instanceSync)
+        {
+            instances = _instances.ToArray();
+        }
+
         return Task.FromResult(new LauncherSnapshot(
             _settings,
-            FakeInstances,
+            instances,
             accounts,
             activeId,
             [new JavaRuntime(@"C:\Java\jdk-21\bin\java.exe", 21, true, "Temurin", "21.0.8")],
@@ -77,12 +84,34 @@ public sealed class FakeLauncherFacade : ILauncherFacade
 
     public Task<IReadOnlyList<LoaderVersionInfo>> GetLoaderVersionsAsync(
         LoaderKind loader, string gameVersion, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<LoaderVersionInfo>>(
-            [new LoaderVersionInfo("0.16.0", true, DateTimeOffset.Now.AddDays(-30))]);
+        Task.FromResult<IReadOnlyList<LoaderVersionInfo>>(loader switch
+        {
+            LoaderKind.Fabric =>
+            [
+                new LoaderVersionInfo("0.16.0", true, DateTimeOffset.Now.AddDays(-30)),
+                new LoaderVersionInfo("0.15.11", false, DateTimeOffset.Now.AddDays(-120)),
+            ],
+            LoaderKind.Forge =>
+            [
+                new LoaderVersionInfo("47.3.0", true, DateTimeOffset.Now.AddDays(-20)),
+                new LoaderVersionInfo("47.2.20", false, DateTimeOffset.Now.AddDays(-90)),
+            ],
+            LoaderKind.NeoForge =>
+            [
+                new LoaderVersionInfo("21.1.72", true, DateTimeOffset.Now.AddDays(-10)),
+                new LoaderVersionInfo("21.0.167", false, DateTimeOffset.Now.AddDays(-60)),
+            ],
+            _ => [],
+        });
 
     public Task<InstanceDetail> GetInstanceAsync(string instanceId, CancellationToken ct)
     {
-        var summary = FakeInstances.First(i => i.Id == instanceId);
+        InstanceSummary summary;
+        lock (_instanceSync)
+        {
+            summary = _instances.First(i => i.Id == instanceId);
+        }
+
         return Task.FromResult(new InstanceDetail(
             summary, Path.Combine(@"C:\Lumen\instances", instanceId), null, 4096, string.Empty, 12, 1_234_567));
     }
@@ -191,12 +220,60 @@ public sealed class FakeLauncherFacade : ILauncherFacade
             }
         }
 
-        return FakeInstances[0];
+        var result = new InstanceSummary(
+            request.InstanceId ?? $"fake-{Guid.NewGuid():N}",
+            request.DisplayName,
+            request.VersionId,
+            request.Loader,
+            request.LoaderVersion,
+            request.Isolation,
+            InstanceState.Ready,
+            null,
+            DateTimeOffset.Now);
+        lock (_instanceSync)
+        {
+            var index = _instances.FindIndex(i => i.Id == result.Id);
+            if (index >= 0)
+            {
+                _instances[index] = result;
+            }
+            else
+            {
+                _instances.Insert(0, result);
+            }
+        }
+
+        return result;
     }
 
-    public Task UpdateInstanceAsync(
-        string instanceId, UpdateInstanceRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        Task.CompletedTask;
+    public async Task UpdateInstanceAsync(
+        string instanceId, UpdateInstanceRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        progress.Report(new InstallProgress(
+            InstallStage.Loader, -1, 0, 0, 0, null, request.Loader is null ? "保存设置" : "更换加载器"));
+        await Task.Delay(150, ct);
+
+        lock (_instanceSync)
+        {
+            var index = _instances.FindIndex(i => i.Id == instanceId);
+            if (index < 0)
+            {
+                throw new KeyNotFoundException($"实例不存在：{instanceId}");
+            }
+
+            var current = _instances[index];
+            _instances[index] = current with
+            {
+                Name = request.DisplayName ?? current.Name,
+                VersionId = request.VersionId ?? current.VersionId,
+                Loader = request.Loader ?? current.Loader,
+                LoaderVersion = request.LoaderVersion ?? current.LoaderVersion,
+                Isolation = request.Isolation ?? current.Isolation,
+            };
+        }
+
+        progress.Report(new InstallProgress(InstallStage.Done, 100, 0, 0, 0, null, "已保存实例设置"));
+    }
 
     public async Task RepairInstanceAsync(
         string instanceId, IProgress<InstallProgress> progress, CancellationToken ct)
@@ -207,8 +284,13 @@ public sealed class FakeLauncherFacade : ILauncherFacade
     }
 
     public Task<InstanceSummary> InstallModpackAsync(
-        ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct) =>
-        Task.FromResult(FakeInstances[1]);
+        ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
+    {
+        lock (_instanceSync)
+        {
+            return Task.FromResult(_instances[0]);
+        }
+    }
 
     public Task<GameSession> LaunchAsync(
         string instanceId, IProgress<LaunchEvent> events, CancellationToken ct)
@@ -388,8 +470,13 @@ public sealed class FakeLauncherFacade : ILauncherFacade
         Task.CompletedTask;
 
     public Task<IReadOnlyList<InstanceSummary>> ImportExternalAsync(
-        string path, IProgress<ImportProgress> progress, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<InstanceSummary>>(FakeInstances);
+        string path, IProgress<ImportProgress> progress, CancellationToken ct)
+    {
+        lock (_instanceSync)
+        {
+            return Task.FromResult<IReadOnlyList<InstanceSummary>>(_instances.ToArray());
+        }
+    }
 
     public Task UpdateSettingsAsync(AppSettingsPatch patch, CancellationToken ct) => Task.CompletedTask;
 

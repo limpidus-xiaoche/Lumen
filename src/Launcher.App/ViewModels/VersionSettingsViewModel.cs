@@ -4,12 +4,16 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Launcher.App.Services;
 using Launcher.Protocol;
 
 namespace Launcher.App.ViewModels;
 
 /// <summary>隔离方式下拉项。</summary>
 public sealed record IsolationOption(string Title, IsolationLevel Value);
+
+/// <summary>可切换的加载器下拉项（M5：原版 / Fabric / Forge / NeoForge）。</summary>
+public sealed record LoaderChoice(string Title, LoaderKind Value);
 
 /// <summary>Java 环境下拉项（显示版本与文件位置）。</summary>
 public sealed record JavaOption(string Title, string Path);
@@ -42,8 +46,9 @@ public partial class VersionSettingsViewModel : ObservableObject
     public const string CategoryMods = "Mod 管理";
 
     private readonly ILauncherFacade _facade;
-    private readonly InstanceSummary _instance;
+    private InstanceSummary _instance;
     private readonly Action _back;
+    private readonly Action? _onInstanceChanged;
 
     public ObservableCollection<string> Categories { get; } = [CategoryOverview, CategoryLaunch, CategoryMods];
 
@@ -53,6 +58,18 @@ public partial class VersionSettingsViewModel : ObservableObject
         new IsolationOption("仅隔离 Mod 与配置", IsolationLevel.ModsConfig),
         new IsolationOption("完全隔离", IsolationLevel.Full),
     ];
+
+    /// <summary>M5：可切换的加载器。</summary>
+    public ObservableCollection<LoaderChoice> Loaders { get; } =
+    [
+        new LoaderChoice("原版", LoaderKind.Vanilla),
+        new LoaderChoice("Fabric", LoaderKind.Fabric),
+        new LoaderChoice("Forge", LoaderKind.Forge),
+        new LoaderChoice("NeoForge", LoaderKind.NeoForge),
+    ];
+
+    /// <summary>当前加载器对应的可选版本（原版为空）。</summary>
+    public ObservableCollection<LoaderVersionInfo> LoaderVersions { get; } = [];
 
     public ObservableCollection<ModItem> Mods { get; } = [];
 
@@ -83,22 +100,56 @@ public partial class VersionSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string statusText = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsVanillaLoader))]
+    [NotifyPropertyChangedFor(nameof(CanSwitchLoader))]
+    private LoaderChoice? selectedLoader;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSwitchLoader))]
+    private LoaderVersionInfo? selectedLoaderVersion;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSwitchLoader))]
+    private bool isLoaderBusy;
+
+    [ObservableProperty]
+    private double loaderPercent;
+
+    [ObservableProperty]
+    private bool isLoaderIndeterminate;
+
+    [ObservableProperty]
+    private string loaderStatusText = string.Empty;
+
     public bool IsOverview => SelectedCategory == CategoryOverview;
 
     public bool IsLaunch => SelectedCategory == CategoryLaunch;
 
     public bool IsMods => SelectedCategory == CategoryMods;
 
-    public VersionSettingsViewModel(ILauncherFacade facade, InstanceSummary instance, Action back)
+    public bool IsVanillaLoader => SelectedLoader?.Value == LoaderKind.Vanilla;
+
+    public bool CanSwitchLoader => !IsLoaderBusy && SelectedLoader is not null &&
+                                   (SelectedLoader.Value == LoaderKind.Vanilla || SelectedLoaderVersion is not null);
+
+    public string LoaderCurrentText => _instance.Loader == LoaderKind.Vanilla
+        ? "当前：原版"
+        : $"当前：{LoaderLabel(_instance.Loader)} {_instance.LoaderVersion}".TrimEnd();
+
+    public VersionSettingsViewModel(
+        ILauncherFacade facade, InstanceSummary instance, Action back, Action? onInstanceChanged = null)
     {
         _facade = facade;
         _instance = instance;
         _back = back;
+        _onInstanceChanged = onInstanceChanged;
 
         VersionName = instance.Name;
         VersionText = $"{instance.VersionId} · {LoaderLabel(instance.Loader)}" +
                       (instance.LoaderVersion is null ? string.Empty : $" {instance.LoaderVersion}");
         SelectedIsolation = Isolations.FirstOrDefault(o => o.Value == instance.Isolation) ?? Isolations[0];
+        SelectedLoader = Loaders.FirstOrDefault(l => l.Value == instance.Loader) ?? Loaders[0];
 
         _ = LoadAsync();
     }
@@ -121,6 +172,111 @@ public partial class VersionSettingsViewModel : ObservableObject
         if (value == CategoryMods)
         {
             _ = LoadModsAsync();
+        }
+    }
+
+    partial void OnSelectedLoaderChanged(LoaderChoice? value) => _ = LoadLoaderVersionsAsync();
+
+    /// <summary>按当前加载器 + 实例游戏版本查询可选加载器版本。</summary>
+    private async Task LoadLoaderVersionsAsync()
+    {
+        LoaderVersions.Clear();
+        SelectedLoaderVersion = null;
+
+        if (SelectedLoader is not { } choice)
+        {
+            return;
+        }
+
+        if (choice.Value == LoaderKind.Vanilla)
+        {
+            LoaderStatusText = "原版不依赖加载器";
+            return;
+        }
+
+        LoaderStatusText = $"正在获取 {choice.Title} {_instance.VersionId} 版本…";
+        try
+        {
+            var versions = await _facade.GetLoaderVersionsAsync(
+                choice.Value, _instance.VersionId, CancellationToken.None);
+            if (!Equals(SelectedLoader, choice))
+            {
+                return;
+            }
+
+            foreach (var version in versions)
+            {
+                LoaderVersions.Add(version);
+            }
+
+            SelectedLoaderVersion = LoaderVersions.FirstOrDefault(v => v.Version == _instance.LoaderVersion)
+                                    ?? LoaderVersions.FirstOrDefault(v => v.Stable)
+                                    ?? LoaderVersions.FirstOrDefault();
+            LoaderStatusText = LoaderVersions.Count == 0
+                ? $"{choice.Title} 没有适用于 {_instance.VersionId} 的版本"
+                : $"{choice.Title} {_instance.VersionId} 共 {LoaderVersions.Count} 个版本";
+        }
+        catch (Exception ex)
+        {
+            LoaderStatusText = $"获取加载器版本失败：{ex.Message}";
+        }
+    }
+
+    /// <summary>M5：更换加载器（原版可清除加载器；Forge/NeoForge 走官方 installer）。</summary>
+    [RelayCommand]
+    private async Task ChangeLoaderAsync()
+    {
+        if (!CanSwitchLoader || SelectedLoader is not { } choice)
+        {
+            return;
+        }
+
+        var loaderVersion = choice.Value == LoaderKind.Vanilla
+            ? string.Empty
+            : SelectedLoaderVersion?.Version;
+        if (choice.Value != LoaderKind.Vanilla && string.IsNullOrWhiteSpace(loaderVersion))
+        {
+            LoaderStatusText = "请先选择加载器版本";
+            return;
+        }
+
+        IsLoaderBusy = true;
+        LoaderPercent = 0;
+        IsLoaderIndeterminate = false;
+        LoaderStatusText = $"正在更换为 {choice.Title}…";
+
+        try
+        {
+            var progress = new Progress<InstallProgress>(p => UiThread.Post(() =>
+            {
+                IsLoaderIndeterminate = p.Percent < 0;
+                LoaderPercent = p.Percent < 0 ? 0 : p.Percent;
+                LoaderStatusText = $"更换加载器：{p.Message}";
+            }));
+
+            await _facade.UpdateInstanceAsync(
+                _instance.Id,
+                new UpdateInstanceRequest(null, null, choice.Value, loaderVersion, null, null),
+                progress,
+                CancellationToken.None);
+
+            var detail = await _facade.GetInstanceAsync(_instance.Id, CancellationToken.None);
+            _instance = detail.Summary;
+            VersionText = $"{_instance.VersionId} · {LoaderLabel(_instance.Loader)}" +
+                          (string.IsNullOrWhiteSpace(_instance.LoaderVersion) ? string.Empty : $" {_instance.LoaderVersion}");
+            OnPropertyChanged(nameof(LoaderCurrentText));
+            LoaderStatusText = choice.Value == LoaderKind.Vanilla
+                ? "已更换为原版"
+                : $"已更换为 {choice.Title} {loaderVersion}";
+            _onInstanceChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            LoaderStatusText = $"更换加载器失败：{ex.Message}";
+        }
+        finally
+        {
+            IsLoaderBusy = false;
         }
     }
 
