@@ -37,6 +37,28 @@
       <Setter Property="FontSize" Value="11" />
     </Style>
 
+    <!-- 账号信息整块可点：进入账户页，不改变原有卡片视觉 -->
+    <Style Selector="Button.account-hit">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <ContentPresenter Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="Center" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="Button.account-hit:pointerover">
+      <Setter Property="Opacity" Value="0.85" />
+    </Style>
+
     <!-- 登录方式 pill（离线/正版） -->
     <Style Selector="RadioButton.pill">
       <Setter Property="Padding" Value="14,4" />
@@ -208,23 +230,27 @@
                          IsChecked="{Binding $parent[Window].DataContext.Accounts.OnlineMode}" />
           </StackPanel>
 
-          <StackPanel Orientation="Horizontal" Spacing="12">
-            <Border Width="52" Height="52" CornerRadius="6"
-                    ClipToBounds="True" Background="#241634"
-                    BorderBrush="#40A275F5" BorderThickness="1">
-              <Image Source="{Binding $parent[Window].DataContext.Accounts.Avatar}"
-                     RenderOptions.BitmapInterpolationMode="None"
-                     Stretch="UniformToFill" />
-            </Border>
-            <StackPanel VerticalAlignment="Center" Spacing="4" MaxWidth="140">
-              <TextBlock Text="{Binding $parent[Window].DataContext.Accounts.Username}"
-                         FontSize="14" Foreground="{DynamicResource TextPrimary}"
-                         TextTrimming="CharacterEllipsis" />
-              <TextBlock Text="离线账户 · 点击登录" FontSize="11"
-                         Foreground="{DynamicResource TextSecondary}"
-                         TextTrimming="CharacterEllipsis" />
+          <Button Classes="account-hit"
+                  Command="{Binding $parent[Window].DataContext.ShowAccountsCommand}"
+                  ToolTip.Tip="管理账户">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Border Width="52" Height="52" CornerRadius="6"
+                      ClipToBounds="True" Background="#241634"
+                      BorderBrush="#40A275F5" BorderThickness="1">
+                <Image Source="{Binding $parent[Window].DataContext.Accounts.Avatar}"
+                       RenderOptions.BitmapInterpolationMode="None"
+                       Stretch="UniformToFill" />
+              </Border>
+              <StackPanel VerticalAlignment="Center" Spacing="4" MaxWidth="140">
+                <TextBlock Text="{Binding $parent[Window].DataContext.Accounts.Username}"
+                           FontSize="14" Foreground="{DynamicResource TextPrimary}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding $parent[Window].DataContext.Accounts.AccountSubtitle}" FontSize="11"
+                           Foreground="{DynamicResource TextSecondary}"
+                           TextTrimming="CharacterEllipsis" />
+              </StackPanel>
             </StackPanel>
-          </StackPanel>
+          </Button>
 
           <Border BorderBrush="#1FA275F5" BorderThickness="0,1,0,0" Padding="0,10,0,0">
             <Grid ColumnDefinitions="*,Auto">

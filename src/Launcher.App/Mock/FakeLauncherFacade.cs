@@ -1,3 +1,4 @@
+using Launcher.Core.Auth;
 using Launcher.Protocol;
 
 namespace Launcher.App.Mock;
@@ -9,6 +10,24 @@ public sealed class FakeLauncherFacade : ILauncherFacade
 {
     private readonly AppSettings _settings = new() { GameDir = @"C:\Lumen\game" };
 
+    private readonly object _accountSync = new();
+    private readonly List<AccountSummary> _accounts;
+    private string? _activeAccountId;
+
+    /// <param name="startSignedIn">为 false 时模拟全新安装（没有账户）。</param>
+    public FakeLauncherFacade(bool startSignedIn = true)
+    {
+        _accounts = startSignedIn
+            ?
+            [
+                new AccountSummary(
+                    "offline-demo", AuthMode.Offline, "Player",
+                    "00000000000030008000000000000000", null, true, null),
+            ]
+            : [];
+        _activeAccountId = startSignedIn ? "offline-demo" : null;
+    }
+
     private static readonly InstanceSummary[] FakeInstances =
     [
         new("demo-vanilla", "原版 1.21.1", "1.21.1", LoaderKind.Vanilla, null,
@@ -17,15 +36,27 @@ public sealed class FakeLauncherFacade : ILauncherFacade
             IsolationLevel.ModsConfig, InstanceState.Ready, null, DateTimeOffset.Now.AddDays(-3)),
     ];
 
-    public Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct) =>
-        Task.FromResult(new LauncherSnapshot(
+    public Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
+    {
+        AccountSummary[] accounts;
+        string? activeId;
+        lock (_accountSync)
+        {
+            activeId = _activeAccountId;
+            accounts = _accounts
+                .Select(a => a with { IsActive = a.Id == activeId })
+                .ToArray();
+        }
+
+        return Task.FromResult(new LauncherSnapshot(
             _settings,
             FakeInstances,
-            [new AccountSummary("offline-demo", AuthMode.Offline, "Player", "00000000000030008000000000000000", null, true, null)],
-            "offline-demo",
+            accounts,
+            activeId,
             [new JavaRuntime(@"C:\Java\jdk-21\bin\java.exe", 21, true, "Temurin", "21.0.8")],
             DateTimeOffset.Now.AddMinutes(-5),
             "0.1.0-m0"));
+    }
 
     /// <summary>任务中心演示数据：覆盖进行中、不确定进度、失败与重启中断四种状态。</summary>
     private readonly List<TaskInfo> _tasks =
@@ -201,24 +232,105 @@ public sealed class FakeLauncherFacade : ILauncherFacade
     public Task<IReadOnlyList<RunningSession>> GetRunningSessionsAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<RunningSession>>([]);
 
-    public Task<AccountSummary> LoginAsync(
+    public async Task<AccountSummary> LoginAsync(
         LoginRequest request, IProgress<LoginEvent> progress, CancellationToken ct)
     {
-        if (request.Mode != AuthMode.Offline)
+        AccountSummary account;
+        switch (request.Mode)
         {
-            throw new NotSupportedException("Fake 仅支持离线账户。");
+            case AuthMode.Offline:
+            {
+                var name = string.IsNullOrWhiteSpace(request.Username) ? "Player" : request.Username.Trim();
+                account = new AccountSummary(
+                    $"offline:{name}", AuthMode.Offline, name,
+                    UuidFor(name), null, true, null);
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"离线账户：{name}"));
+                break;
+            }
+
+            case AuthMode.Microsoft:
+            {
+                progress.Report(new LoginEvent(
+                    LoginEventKind.DeviceCode,
+                    "请在浏览器打开 https://www.microsoft.com/link 并输入代码 FAKE-1234",
+                    "FAKE-1234",
+                    "https://www.microsoft.com/link"));
+                await Task.Delay(300, ct);
+                progress.Report(new LoginEvent(LoginEventKind.WaitingForUser, "等待 Microsoft 登录完成…"));
+                await Task.Delay(300, ct);
+                account = new AccountSummary(
+                    "msa:fake", AuthMode.Microsoft, "Steve",
+                    UuidFor("msa:fake"), null, true, DateTimeOffset.Now.AddDays(1));
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"Microsoft 账户：{account.Username}"));
+                break;
+            }
+
+            case AuthMode.Authlib:
+            {
+                if (string.IsNullOrWhiteSpace(request.ServerUrl) ||
+                    string.IsNullOrWhiteSpace(request.Username) ||
+                    string.IsNullOrWhiteSpace(request.Password))
+                {
+                    throw new AuthException("E6005", "外置登录需要服务器地址、用户名与密码。");
+                }
+
+                var host = new Uri(request.ServerUrl).Host;
+                var name = request.Username.Trim();
+                account = new AccountSummary(
+                    $"authlib:{name}@{host}", AuthMode.Authlib, name,
+                    UuidFor($"{name}@{host}"), null, true, null);
+                progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"外置账户：{name}"));
+                break;
+            }
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(request), request.Mode, "未知的登录方式。");
         }
 
-        var name = request.Username ?? "Player";
-        progress.Report(new LoginEvent(LoginEventKind.Succeeded, $"离线登录：{name}"));
-        return Task.FromResult(new AccountSummary(
-            "offline-" + name, AuthMode.Offline, name, "00000000000030008000000000000000",
-            null, true, null));
+        lock (_accountSync)
+        {
+            _accounts.RemoveAll(a => a.Id == account.Id);
+            _accounts.Add(account);
+            _activeAccountId = account.Id;
+        }
+
+        return account with { IsActive = true };
     }
 
-    public Task LogoutAsync(string accountId, CancellationToken ct) => Task.CompletedTask;
+    public Task LogoutAsync(string accountId, CancellationToken ct)
+    {
+        lock (_accountSync)
+        {
+            _accounts.RemoveAll(a => a.Id == accountId);
+            if (_activeAccountId == accountId)
+            {
+                _activeAccountId = _accounts.FirstOrDefault()?.Id;
+            }
+        }
 
-    public Task SetActiveAccountAsync(string accountId, CancellationToken ct) => Task.CompletedTask;
+        return Task.CompletedTask;
+    }
+
+    public Task SetActiveAccountAsync(string accountId, CancellationToken ct)
+    {
+        lock (_accountSync)
+        {
+            if (!_accounts.Any(a => a.Id == accountId))
+            {
+                throw new KeyNotFoundException($"账户不存在：{accountId}");
+            }
+
+            _activeAccountId = accountId;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static string UuidFor(string value)
+    {
+        var hash = System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexStringLower(hash);
+    }
 
     private static readonly List<ModEntry> FakeMods =
     [
