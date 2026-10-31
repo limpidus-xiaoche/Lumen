@@ -1,5 +1,7 @@
 using Avalonia;
 using Launcher.Core.Storage;
+using Launcher.Core.Update;
+using Launcher.Protocol;
 using Serilog;
 using Velopack;
 
@@ -42,6 +44,23 @@ internal static class Program
             Log.Error(e.Exception, "未观察的任务异常");
             e.SetObserved();
         };
+
+        // §12.1：冷启动快校验。Release 缺清单或哈希不符即 fail-closed，不进入主界面。
+        try
+        {
+            var report = new IntegrityService(paths)
+                .VerifyAsync(IntegrityCheckMode.Quick)
+                .GetAwaiter()
+                .GetResult();
+            Log.Information(
+                "启动完整性快校验：{Message}（检查 {Files} 个文件）",
+                report.Message, report.CheckedFiles);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "启动完整性校验失败，拒绝进入主界面");
+            App.StartupIntegrityError = ex;
+        }
 
         try
         {

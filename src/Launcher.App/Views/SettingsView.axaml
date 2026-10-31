@@ -53,6 +53,30 @@
 
       <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
         <StackPanel Spacing="8">
+          <TextBlock Text="维护与安全" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+          <TextBlock Text="完整性校验（E8002）、更新包校验（E8001）、脱敏诊断包导出"
+                     FontSize="11" Foreground="{DynamicResource TextMuted}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="快速校验" Command="{Binding CheckIntegrityCommand}" CommandParameter="quick"
+                    IsEnabled="{Binding IsMaintenanceIdle}" />
+            <Button Content="全量校验" Command="{Binding CheckIntegrityCommand}" CommandParameter="full"
+                    IsEnabled="{Binding IsMaintenanceIdle}" />
+            <Button Content="导出诊断" Command="{Binding ExportDiagnosticsCommand}"
+                    IsEnabled="{Binding IsMaintenanceIdle}" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="检查更新" Command="{Binding CheckUpdateCommand}"
+                    IsEnabled="{Binding IsMaintenanceIdle}" />
+            <Button Content="安装更新" Command="{Binding InstallUpdateCommand}"
+                    IsEnabled="{Binding CanInstallUpdate}" />
+          </StackPanel>
+          <TextBlock Text="{Binding MaintenanceStatus}" TextWrapping="Wrap"
+                     FontSize="12" Foreground="{DynamicResource TextMuted}" />
+        </StackPanel>
+      </Border>
+
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
           <TextBlock Text="其他入口" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="实例管理" Command="{Binding OpenInstancesCommand}" />

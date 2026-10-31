@@ -28,6 +28,23 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool isDarkTheme = true;
 
+    /// <summary>维护操作（完整性/更新/诊断）的最近结果。</summary>
+    [ObservableProperty]
+    private string maintenanceStatus = "尚未执行维护操作";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMaintenanceIdle))]
+    [NotifyPropertyChangedFor(nameof(CanInstallUpdate))]
+    private bool isMaintenanceBusy;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanInstallUpdate))]
+    private UpdateInfo? pendingUpdate;
+
+    public bool IsMaintenanceIdle => !IsMaintenanceBusy;
+
+    public bool CanInstallUpdate => PendingUpdate is not null && !IsMaintenanceBusy;
+
     public SettingsViewModel(
         ILauncherFacade facade,
         InstancesViewModel instances,
@@ -82,6 +99,119 @@ public partial class SettingsViewModel : ObservableObject
     {
         _ = _logs.LoadAsync();
         _openSubPage(_logs);
+    }
+
+    /// <summary>§12.1：快速/全量完整性校验（失败时门面抛 E8002）。</summary>
+    [RelayCommand]
+    private async Task CheckIntegrityAsync(string? mode)
+    {
+        if (IsMaintenanceBusy)
+        {
+            return;
+        }
+
+        var checkMode = string.Equals(mode, "full", StringComparison.OrdinalIgnoreCase)
+            ? IntegrityCheckMode.Full
+            : IntegrityCheckMode.Quick;
+        IsMaintenanceBusy = true;
+        MaintenanceStatus = checkMode == IntegrityCheckMode.Full
+            ? "正在全量校验程序文件…"
+            : "正在快速校验程序文件…";
+        try
+        {
+            var report = await _facade.VerifyIntegrityAsync(checkMode, CancellationToken.None);
+            MaintenanceStatus = $"{report.Message}（检查 {report.CheckedFiles} 个文件）";
+        }
+        catch (Exception ex)
+        {
+            MaintenanceStatus = $"完整性校验失败：{ex.Message}";
+        }
+        finally
+        {
+            IsMaintenanceBusy = false;
+        }
+    }
+
+    /// <summary>导出脱敏诊断包，返回 zip 路径。</summary>
+    [RelayCommand]
+    private async Task ExportDiagnosticsAsync()
+    {
+        if (IsMaintenanceBusy)
+        {
+            return;
+        }
+
+        IsMaintenanceBusy = true;
+        MaintenanceStatus = "正在导出诊断包…";
+        try
+        {
+            var path = await _facade.ExportDiagnosticsAsync(null, CancellationToken.None);
+            MaintenanceStatus = $"诊断包已导出：{path}";
+        }
+        catch (Exception ex)
+        {
+            MaintenanceStatus = $"导出诊断包失败：{ex.Message}";
+        }
+        finally
+        {
+            IsMaintenanceBusy = false;
+        }
+    }
+
+    /// <summary>检查更新；发现新版本后由「安装更新」按钮执行下载与校验。</summary>
+    [RelayCommand]
+    private async Task CheckUpdateAsync()
+    {
+        if (IsMaintenanceBusy)
+        {
+            return;
+        }
+
+        IsMaintenanceBusy = true;
+        MaintenanceStatus = "正在检查更新…";
+        try
+        {
+            PendingUpdate = await _facade.CheckUpdateAsync(CancellationToken.None);
+            MaintenanceStatus = PendingUpdate is null
+                ? "已是最新版本。"
+                : $"发现新版本 {PendingUpdate.Version}，可点击「安装更新」。";
+        }
+        catch (Exception ex)
+        {
+            PendingUpdate = null;
+            MaintenanceStatus = $"检查更新失败：{ex.Message}";
+        }
+        finally
+        {
+            IsMaintenanceBusy = false;
+        }
+    }
+
+    /// <summary>下载并校验更新包，通过后启动安装器（E8001 时门面抛异常）。</summary>
+    [RelayCommand]
+    private async Task InstallUpdateAsync()
+    {
+        if (PendingUpdate is null || IsMaintenanceBusy)
+        {
+            return;
+        }
+
+        IsMaintenanceBusy = true;
+        MaintenanceStatus = "正在下载更新…";
+        var progress = new Progress<UpdateProgress>(p => MaintenanceStatus = p.Message);
+        try
+        {
+            await _facade.ApplyUpdateAsync(PendingUpdate, progress, CancellationToken.None);
+            MaintenanceStatus = "更新已下载并通过校验，安装器已启动。";
+        }
+        catch (Exception ex)
+        {
+            MaintenanceStatus = $"安装更新失败：{ex.Message}";
+        }
+        finally
+        {
+            IsMaintenanceBusy = false;
+        }
     }
 
     /// <summary>切换深浅主题（M0 先直接改全局主题变体）。</summary>
