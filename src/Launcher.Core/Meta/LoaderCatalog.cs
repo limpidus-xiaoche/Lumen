@@ -21,10 +21,12 @@ public sealed class LoaderCatalog
         "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
 
     private readonly HttpClient _http;
+    private readonly Func<DownloadSourceMode> _sourceMode;
 
-    public LoaderCatalog(HttpClient? http = null)
+    public LoaderCatalog(HttpClient? http = null, Func<DownloadSourceMode>? sourceMode = null)
     {
         _http = http ?? CreateHttpClient();
+        _sourceMode = sourceMode ?? (static () => DownloadSourceMode.Auto);
     }
 
     public async Task<IReadOnlyList<LoaderVersionInfo>> GetVersionsAsync(
@@ -62,6 +64,56 @@ public sealed class LoaderCatalog
     public static string NeoForgeInstallerUrl(string loaderVersion) =>
         $"https://maven.neoforged.net/releases/net/neoforged/neoforge/{loaderVersion}/" +
         $"neoforge-{loaderVersion}-installer.jar";
+
+    /// <summary>官方加载器域名 → BMCLAPI 镜像地址；无对应镜像的地址保持不变。</summary>
+    public static string MapToMirror(string url) =>
+        url.Replace("https://maven.minecraftforge.net", "https://bmclapi2.bangbang93.com/maven", StringComparison.OrdinalIgnoreCase)
+           .Replace("https://files.minecraftforge.net", "https://bmclapi2.bangbang93.com", StringComparison.OrdinalIgnoreCase)
+           .Replace("https://maven.neoforged.net/releases", "https://bmclapi2.bangbang93.com/maven", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 加载器元数据 / installer 候选地址：Official 仅官方；Mirror 镜像优先、官方兜底；
+    /// Auto 默认官方优先（<paramref name="mirrorFirstWhenAuto"/> 为 true 时保持镜像优先的旧行为）。
+    /// </summary>
+    public static IReadOnlyList<string> BuildLoaderCandidates(
+        string url, DownloadSourceMode mode, bool mirrorFirstWhenAuto = false)
+    {
+        var mirror = MapToMirror(url);
+        var hasMirror = !string.Equals(mirror, url, StringComparison.OrdinalIgnoreCase);
+        var result = new List<string>();
+        switch (mode)
+        {
+            case DownloadSourceMode.Official:
+                result.Add(url);
+                break;
+            case DownloadSourceMode.Mirror:
+                if (hasMirror)
+                {
+                    result.Add(mirror);
+                }
+
+                result.Add(url);
+                break;
+            default:
+                if (hasMirror && mirrorFirstWhenAuto)
+                {
+                    result.Add(mirror);
+                    result.Add(url);
+                }
+                else
+                {
+                    result.Add(url);
+                    if (hasMirror)
+                    {
+                        result.Add(mirror);
+                    }
+                }
+
+                break;
+        }
+
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
 
     public static IReadOnlyList<LoaderVersionInfo> ParseFabricVersions(string json)
     {
@@ -200,7 +252,7 @@ public sealed class LoaderCatalog
                 : null;
         }
         catch (Exception ex) when (!ct.IsCancellationRequested &&
-                                   ex is HttpRequestException or JsonException or DownloadException)
+                                   ex is HttpRequestException or JsonException or DownloadException or InstallException)
         {
             return null;
         }
@@ -208,15 +260,21 @@ public sealed class LoaderCatalog
 
     private async Task<string> GetStringAsync(string url, CancellationToken ct)
     {
-        UrlGuard.Validate(url);
-        try
+        Exception? last = null;
+        foreach (var candidate in BuildLoaderCandidates(url, _sourceMode()))
         {
-            return await _http.GetStringAsync(url, ct);
+            UrlGuard.Validate(candidate);
+            try
+            {
+                return await _http.GetStringAsync(candidate, ct);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                last = ex;
+            }
         }
-        catch (Exception ex) when (!ct.IsCancellationRequested)
-        {
-            throw new InstallException("E3001", $"加载器元数据请求失败：{url}", ex);
-        }
+
+        throw new InstallException("E3001", $"加载器元数据请求失败：{url}", last);
     }
 
     private static IReadOnlyList<string> ParseMavenVersions(string xml)

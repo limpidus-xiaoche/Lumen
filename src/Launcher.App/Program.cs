@@ -1,4 +1,5 @@
 using Avalonia;
+using Launcher.Core.Download;
 using Launcher.Core.Storage;
 using Launcher.Core.Update;
 using Launcher.Protocol;
@@ -35,6 +36,20 @@ internal static class Program
         if (portableFellBack)
         {
             Log.Warning("便携目录不可写，已回退到用户目录：{LocalRoot}", paths.LocalRoot);
+        }
+
+        // 代理设置只影响之后新建的 HttpClient；失败只记日志，不阻断启动。
+        try
+        {
+            if (!NetworkPolicy.TryApply(new AppSettingsStore(paths).Load(), out var proxyError) &&
+                proxyError is not null)
+            {
+                Log.Warning("应用代理设置失败：{Error}", proxyError);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "读取代理设置失败，继续使用系统默认代理");
         }
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>

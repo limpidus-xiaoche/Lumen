@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using Launcher.Core.Download;
+using Launcher.Protocol;
 using Xunit;
 
 namespace Launcher.Core.Tests;
@@ -60,6 +61,63 @@ public sealed class DownloadEngineTests
         Assert.True(handler.RangeRequests > 0);
 
         Directory.Delete(dir, recursive: true);
+    }
+
+    [Fact]
+    public void Official_Does_Not_Add_Bmclapi_Mirror()
+    {
+        var item = new DownloadItem(
+            "https://piston-meta.mojang.com/v1/packages/1.21.1.json",
+            "dest.json",
+            null,
+            0,
+            Mirrors: ["https://example.invalid/explicit.json"]);
+
+        var candidates = DownloadEngine.BuildCandidates(item, DownloadSourceMode.Official);
+
+        Assert.DoesNotContain(candidates, url => url.Contains("bmclapi", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(new[] { item.Url, "https://example.invalid/explicit.json" }, candidates);
+    }
+
+    [Fact]
+    public void Mirror_Prefers_Bmclapi_With_Original_As_Fallback()
+    {
+        var item = new DownloadItem(
+            "https://piston-meta.mojang.com/v1/packages/1.21.1.json",
+            "dest.json",
+            null,
+            0,
+            Mirrors: ["https://example.invalid/explicit.json"]);
+
+        var candidates = DownloadEngine.BuildCandidates(item, DownloadSourceMode.Mirror);
+
+        Assert.StartsWith(
+            "https://bmclapi2.bangbang93.com", candidates[0], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://example.invalid/explicit.json", candidates);
+        Assert.Equal(item.Url, candidates[^1]);
+        Assert.Equal("https://bmclapi2.bangbang93.com/v1/packages/1.21.1.json", candidates[0]);
+    }
+
+    [Fact]
+    public void Auto_Keeps_Original_Then_Explicit_Then_Bmclapi()
+    {
+        var item = new DownloadItem(
+            "https://piston-meta.mojang.com/v1/packages/1.21.1.json",
+            "dest.json",
+            null,
+            0,
+            Mirrors: ["https://example.invalid/explicit.json"]);
+
+        var candidates = DownloadEngine.BuildCandidates(item, DownloadSourceMode.Auto);
+
+        Assert.Equal(
+            new[]
+            {
+                item.Url,
+                "https://example.invalid/explicit.json",
+                "https://bmclapi2.bangbang93.com/v1/packages/1.21.1.json",
+            },
+            candidates);
     }
 
     private static string TempDir()

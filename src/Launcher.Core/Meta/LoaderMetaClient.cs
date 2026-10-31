@@ -24,8 +24,8 @@ public sealed class LoaderMetaClient
         "https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/maven-metadata.xml";
     private const string NeoForgeMetadataOfficial =
         "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
-    private const string NeoForgeLegacyMetadataMirror =
-        "https://bmclapi2.bangbang93.com/maven/net/neoforged/forge/maven-metadata.xml";
+    private const string NeoForgeLegacyMetadataOfficial =
+        "https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml";
 
     private static readonly Regex NeoForgeGame = new(@"^1\.(\d+)(?:\.(\d+))?$", RegexOptions.Compiled);
 
@@ -36,12 +36,15 @@ public sealed class LoaderMetaClient
 
     private readonly LauncherPaths _paths;
     private readonly HttpClient _http;
+    private readonly Func<DownloadSourceMode> _sourceMode;
     private readonly ConcurrentDictionary<string, IReadOnlyList<LoaderVersionInfo>> _cache = new();
 
-    public LoaderMetaClient(LauncherPaths paths, HttpClient? http = null)
+    public LoaderMetaClient(
+        LauncherPaths paths, HttpClient? http = null, Func<DownloadSourceMode>? sourceMode = null)
     {
         _paths = paths;
         _http = http ?? CreateHttpClient();
+        _sourceMode = sourceMode ?? (static () => DownloadSourceMode.Auto);
     }
 
     /// <summary>加载器是否支持从启动器直接安装（Fabric / Quilt 使用官方 profile JSON）。</summary>
@@ -127,7 +130,7 @@ public sealed class LoaderMetaClient
     /// <summary>Forge：maven 元数据按「游戏版本-加载器版本」命名，剔除前缀后得到加载器版本号。</summary>
     private async Task<IReadOnlyList<LoaderVersionInfo>> GetForgeAsync(string gameVersion, CancellationToken ct)
     {
-        var xml = await GetStringWithFallbackAsync(ForgeMetadata, null, ct);
+        var xml = await GetStringWithFallbackAsync(ForgeMetadata, ct);
         var versions = ParseMavenVersions(xml, $"{gameVersion}-", stripPrefix: true);
 
         var recommended = await TryGetForgeRecommendedAsync(gameVersion, ct);
@@ -143,7 +146,8 @@ public sealed class LoaderMetaClient
     {
         try
         {
-            var promotions = await _http.GetFromJsonAsync<ForgePromotions>(ForgePromotionsUrl, JsonOptions, ct);
+            var json = await GetStringWithFallbackAsync(ForgePromotionsUrl, ct);
+            var promotions = JsonSerializer.Deserialize<ForgePromotions>(json, JsonOptions);
             return promotions?.Promos is not null &&
                    promotions.Promos.TryGetValue($"{gameVersion}-recommended", out var version)
                 ? version
@@ -169,14 +173,16 @@ public sealed class LoaderMetaClient
 
         if (major == "20" && minor == "1")
         {
-            var legacyXml = await GetStringWithFallbackAsync(NeoForgeLegacyMetadataMirror, null, ct);
+            var legacyXml = await GetStringWithFallbackAsync(
+                NeoForgeLegacyMetadataOfficial, ct, mirrorFirstWhenAuto: true);
             return ParseMavenVersions(legacyXml, "1.20.1-", stripPrefix: true)
                 .Select(v => new LoaderVersionInfo(v, true, null))
                 .Reverse()
                 .ToArray();
         }
 
-        var xml = await GetStringWithFallbackAsync(NeoForgeMetadataMirror, NeoForgeMetadataOfficial, ct);
+        var xml = await GetStringWithFallbackAsync(
+            NeoForgeMetadataOfficial, ct, mirrorFirstWhenAuto: true);
         var prefix = $"{major}.{minor}.";
         return ParseMavenVersions(xml, prefix, stripPrefix: false)
             .Select(v => new LoaderVersionInfo(v, true, null))
@@ -202,16 +208,24 @@ public sealed class LoaderMetaClient
         return result;
     }
 
-    private async Task<string> GetStringWithFallbackAsync(string primary, string? fallback, CancellationToken ct)
+    private async Task<string> GetStringWithFallbackAsync(
+        string url, CancellationToken ct, bool mirrorFirstWhenAuto = false)
     {
-        try
+        Exception? first = null;
+        var candidates = LoaderCatalog.BuildLoaderCandidates(url, _sourceMode(), mirrorFirstWhenAuto);
+        foreach (var candidate in candidates)
         {
-            return await _http.GetStringAsync(primary, ct);
+            try
+            {
+                return await _http.GetStringAsync(candidate, ct);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                first ??= ex;
+            }
         }
-        catch (Exception) when (!ct.IsCancellationRequested && fallback is not null)
-        {
-            return await _http.GetStringAsync(fallback, ct);
-        }
+
+        throw first ?? new HttpRequestException($"加载器元数据请求失败：{url}");
     }
 
     private static HttpClient CreateHttpClient()

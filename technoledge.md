@@ -245,6 +245,17 @@ public interface ILauncherFacade
     // ---------- 模组 ----------
     Task<IReadOnlyList<ModEntry>> ScanModsAsync(string instanceId, CancellationToken ct);
     Task SetModEnabledAsync(string instanceId, string modId, bool enabled, CancellationToken ct);
+    Task DeleteModAsync(string instanceId, string modId, CancellationToken ct);
+    Task ImportModAsync(string instanceId, string sourceJarPath, CancellationToken ct);
+
+    // ---------- 在线模组（能力查询 + Modrinth / CurseForge） ----------
+    bool IsCurseForgeAvailable { get; }   // 未配置 LUMEN_CURSEFORGE_KEY 时为 false
+    Task<IReadOnlyList<OnlineModSummary>> SearchOnlineModsAsync(
+        ModSource source, string query, string? modCategory, LoaderKind? loader,
+        string? gameVersion, int page, CancellationToken ct);
+    Task<string> InstallOnlineModAsync(
+        string instanceId, ModSource source, string projectId, string? gameVersion,
+        LoaderKind loader, IProgress<InstallProgress> progress, CancellationToken ct);
 
     // ---------- 实例运维 ----------
     Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct);
@@ -523,12 +534,13 @@ CF 的 `manifest.json` 只给 `projectID/fileID`，取下载地址必须调 CF A
 - 解析优先 `release` 文件的 `JAVA_VERSION`，回退 `java -XshowSettings:properties -version`。
 - 选择以 `version.json` 的 `javaVersion.majorVersion` 为准；兜底：≤1.16.5→8，1.17→16，1.18–1.20.4→17，≥1.20.5→21。
 - **架构约束（澄清）**：**启动器本体只支持 x64 Windows**（ARM64 不验收）；**游戏 Java 可为 32 位，但仅允许 ≤1.12.2**。1.13+ 必须先过滤掉 32 位 JRE，否则会出现"选到 32 位 8u → 分配不到内存 → 启动崩溃"的难查问题。
-- **JRE 下载（明确 raw/lzma）**：Mojang `java-runtime` manifest 的 `files` 同时提供 `raw` 与 `lzma`；**v1 只取 `raw`**（§2 只有 `System.IO.Compression`，不支持 LZMA）。若某组件只有 `lzma`，报 `E4003` 并引导换供应商 JRE，**不临时引入 7z 依赖**。下载后按 `sha1` 校验，落 `runtimes/`。
+- **JRE 下载（明确 raw/lzma）**：Mojang `java-runtime` manifest 的 `files` 同时提供 `raw` 与 `lzma`；**v1 只取 `raw`**（§2 只有 `System.IO.Compression`，不支持 LZMA）。若某组件只有 `lzma`，报 `E4003` 并引导换供应商 JRE，**不临时引入 7z 依赖**。下载后按 `sha1` 校验，落 `shared/runtimes/<component>`。
+- **自动下载（已实现，2026-10-31）**：`JavaRuntimeInstaller` 按 `javaVersion.component`（缺失时 8→`jre-legacy`、16→`java-runtime-alpha`、17→`java-runtime-beta`、21→`java-runtime-gamma`）取 `windows-x64` 的 raw manifest，逐文件 SHA1 校验后落盘；`LaunchService` 与 `LoaderInstaller` 在 `E4001` 时触发一次下载并重试。目标路径经 `PathGuard` 校验，拒绝 `..` 逃逸。
 
 ### 6.5 Launch（A）
 
 - 变量表与三家一致；**未解析变量必须报 `E5002`**，不能把 `${...}` 原样传给游戏。
-- 32K 命令行：Java 9+ 用 `@argfile`；Java 8 回退 wrapper jar（manifest `Class-Path`）。
+- 32K 命令行：Java 9+ 用 `@argfile`；**Java 8 已改为通配 classpath 目录**（`cache/cp8/<classpath 哈希>/`，按原顺序硬链接/复制为 `0001-<文件名>`，启动参数替换为 `<dir>/*`），不引入 wrapper jar；替换后仍超长才报 `E5003`。
 - **argfile 编码（P0 修正，写死）**：
   - 编码由目标 JRE 主版本**静态决定**：**JDK ≤17 → 系统 ANSI 代码页**（`CultureInfo.CurrentCulture.TextInfo.ANSICodePage`，中文 Windows 为 936）；**JDK ≥18 → UTF-8**（JEP 400）。
   - 首次遇到某个 Java 路径时做一次 `sun.jnu.encoding` 探测，结果**缓存到 DB**（`java_path → encoding`）；之后启动不再起进程。
@@ -989,6 +1001,10 @@ docs: 契约 v0.5
 | 21 | CmlLib 复用边界 | 只复用无状态工具；下载/安装/启动/Java/账户/实例自研；M0 出结论 | 未出结论默认自研；**禁止双路径并存** |
 | 22 | 协作身份 | **临时：deploy key 写权限**（账号暂不可用）；目标：collaborators + 用户级 SSH，deploy key 仅 CI 只读 | 分支推送 + owner 合并；账号恢复后迁移 |
 | 23 | 发布形态 | self-contained + R2R + 非单文件/非裁剪 | Velopack delta 对目录型产物最稳 |
+| 24 | 代理 / 下载源 | 设置页可配：System/Manual/None；Auto/Official/Mirror；覆盖 DownloadEngine、ManifestClient、LoaderCatalog、LoaderMetaClient | 仅影响之后新建的 HttpClient；已存在客户端可能沿用旧代理 |
+| 25 | Java 自动下载 | Mojang java-runtime raw manifest + SHA1，落 `shared/runtimes`；启动与加载器安装缺 Java 时自动下载一次 | 只取 raw，不引入 LZMA |
+| 26 | Java 8 超长命令行 | 通配 classpath 目录（按原顺序编号），不引入 wrapper jar | 展开顺序依赖目录字母序，需 Forge 1.12.2 实机回归 |
+| 27 | CurseForge 在线模组 | 由 `IsCurseForgeAvailable` 控制渠道显隐；未配置 `LUMEN_CURSEFORGE_KEY` 时回退 Modrinth | modpack 的 CF API 决策不变（仅直链包） |
 
 ---
 

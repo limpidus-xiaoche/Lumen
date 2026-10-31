@@ -26,6 +26,7 @@ public sealed class LoaderInstaller
     private readonly AppSettingsStore _settings;
     private readonly ILogger<LoaderInstaller> _logger;
     private readonly HttpClient _http;
+    private readonly JavaRuntimeInstaller? _javaInstaller;
 
     public LoaderInstaller(
         LauncherPaths paths,
@@ -34,7 +35,8 @@ public sealed class LoaderInstaller
         JavaLocator javaLocator,
         AppSettingsStore settings,
         ILogger<LoaderInstaller> logger,
-        HttpClient? http = null)
+        HttpClient? http = null,
+        JavaRuntimeInstaller? javaInstaller = null)
     {
         _paths = paths;
         _downloads = downloads;
@@ -43,6 +45,7 @@ public sealed class LoaderInstaller
         _settings = settings;
         _logger = logger;
         _http = http ?? CreateHttpClient();
+        _javaInstaller = javaInstaller;
     }
 
     public async Task<string> InstallAsync(
@@ -187,14 +190,17 @@ public sealed class LoaderInstaller
         IProgress<InstallProgress> progress,
         CancellationToken ct)
     {
-        var (url, mirrors) = request.Loader switch
+        var officialUrl = request.Loader switch
         {
-            LoaderKind.Forge => (
-                LoaderCatalog.ForgeInstallerUrl(request.VersionId, loaderVersion),
-                new[] { LoaderCatalog.ForgeInstallerMirrorUrl(request.VersionId, loaderVersion) }),
-            LoaderKind.NeoForge => (LoaderCatalog.NeoForgeInstallerUrl(loaderVersion), Array.Empty<string>()),
+            LoaderKind.Forge => LoaderCatalog.ForgeInstallerUrl(request.VersionId, loaderVersion),
+            LoaderKind.NeoForge => LoaderCatalog.NeoForgeInstallerUrl(loaderVersion),
             _ => throw new InstallException("E3001", $"{request.Loader} 尚未支持"),
         };
+        var sourceMode = _settings.Load().DownloadSource;
+        var url = officialUrl;
+        var mirrors = LoaderCatalog.BuildLoaderCandidates(officialUrl, sourceMode)
+            .Where(candidate => !string.Equals(candidate, officialUrl, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
 
         var cacheDir = Path.Combine(_paths.CacheDir, "loaders");
         var jarPath = Path.Combine(cacheDir, Path.GetFileName(new Uri(url).AbsolutePath));
@@ -206,7 +212,7 @@ public sealed class LoaderInstaller
             null, ct);
 
         EnsureLauncherProfiles();
-        var java = await SelectJavaAsync(request.VersionId, ct);
+        var java = await SelectJavaAsync(request.VersionId, progress, ct);
         Report(progress, 30, $"运行 {request.Loader} 安装器（{java.MajorVersion}）");
         await RunInstallerAsync(java.Path, jarPath, _paths.SharedDir, progress, ct);
         NormalizeInstalledVersion(request.VersionId, loaderVersion, canonical);
@@ -373,9 +379,58 @@ public sealed class LoaderInstaller
             "E3001", $"加载器安装后未找到继承自 {gameVersion} 的版本 JSON（期望 {canonical}）");
     }
 
-    private async Task<JavaRuntime> SelectJavaAsync(string gameVersion, CancellationToken ct)
+    /// <summary>
+    /// 选择运行加载器官方 installer 所需的 Java；首次 E4001 且注入了运行时安装器时，
+    /// 自动下载对应 Mojang 运行时并重试一次。
+    /// </summary>
+    private async Task<JavaRuntime> SelectJavaAsync(
+        string gameVersion, IProgress<InstallProgress> progress, CancellationToken ct)
     {
         var detail = await _resolver.ResolveAsync(gameVersion, ct);
+
+        Func<int, IProgress<string>?, CancellationToken, Task<JavaRuntime>>? ensureRuntime = null;
+        if (_javaInstaller is not null)
+        {
+            var installer = _javaInstaller;
+            ensureRuntime = (major, textProgress, token) =>
+                installer.EnsureAsync(component: null, major, textProgress, token);
+        }
+
+        return await SelectJavaWithFallbackAsync(
+            () => ChooseJava(detail),
+            detail,
+            ensureRuntime,
+            message => Report(progress, 20, message),
+            ct);
+    }
+
+    /// <summary>
+    /// 可测的选择逻辑：先调用 <paramref name="select"/>；抛 E4001 且提供
+    /// <paramref name="ensureRuntime"/> 时下载运行时后重试一次。
+    /// </summary>
+    public static async Task<JavaRuntime> SelectJavaWithFallbackAsync(
+        Func<JavaRuntime> select,
+        VersionDetail detail,
+        Func<int, IProgress<string>?, CancellationToken, Task<JavaRuntime>>? ensureRuntime,
+        Action<string>? report,
+        CancellationToken ct)
+    {
+        try
+        {
+            return select();
+        }
+        catch (LaunchException ex) when (ex.ErrorCode == "E4001" && ensureRuntime is not null)
+        {
+            var required = JavaVersionPolicy.RequiredMajor(detail);
+            report?.Invoke($"未找到 Java {required}，正在下载 Mojang 运行时…");
+            IProgress<string>? textProgress = report is null ? null : new Progress<string>(report);
+            await ensureRuntime(required, textProgress, ct);
+            return select();
+        }
+    }
+
+    private JavaRuntime ChooseJava(VersionDetail detail)
+    {
         var settings = _settings.Load();
         var runtimes = _javaLocator.Detect().ToList();
         if (!string.IsNullOrWhiteSpace(settings.JavaPath) &&

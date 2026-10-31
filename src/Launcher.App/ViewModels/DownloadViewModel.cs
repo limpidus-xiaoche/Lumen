@@ -62,7 +62,11 @@ public partial class DownloadViewModel : ObservableObject
 
     public ObservableCollection<string> Categories { get; } = [CategoryVanilla, CategoryMods];
 
-    public ObservableCollection<string> ModSources { get; } = ["Modrinth", "CurseForge"];
+    /// <summary>CurseForge 是否可用（API Key 为进程环境变量，构造后不变）。</summary>
+    public bool CanUseCurseForge { get; }
+
+    /// <summary>可用模组来源；未配置 CurseForge Key 时只提供 Modrinth。</summary>
+    public ObservableCollection<string> ModSources { get; }
 
     /// <summary>原版版本筛选：正式版 / 快照 / 全部。</summary>
     public ObservableCollection<string> VersionFilters { get; } = ["正式版", "快照", "全部"];
@@ -242,9 +246,20 @@ public partial class DownloadViewModel : ObservableObject
     public DownloadViewModel(ILauncherFacade facade)
     {
         _facade = facade;
+        CanUseCurseForge = facade.IsCurseForgeAvailable;
+        ModSources = CanUseCurseForge ? ["Modrinth", "CurseForge"] : ["Modrinth"];
         SelectedModCategory = ModCategories[0];
+        if (!CanUseCurseForge)
+        {
+            SelectedSourceName = "Modrinth";
+        }
+
         _ = LoadInstancesAsync();
         _ = LoadAsync();
+        if (!CanUseCurseForge)
+        {
+            StatusText = "CurseForge 需要配置 LUMEN_CURSEFORGE_KEY，已切换到 Modrinth";
+        }
     }
 
     private async Task LoadInstancesAsync()

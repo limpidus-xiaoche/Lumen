@@ -23,23 +23,35 @@ if (portableFellBack)
 }
 // 移除 --portable，避免 System.CommandLine 将其视为未知选项
 var cliArgs = args.Where(a => !string.Equals(a, "--portable", StringComparison.OrdinalIgnoreCase)).ToArray();
-var manifestClient = new ManifestClient(launcherPaths);
-var loaderMetaClient = new LoaderMetaClient(launcherPaths);
+
+// 先应用代理设置，再创建任何可能缓存 HttpClient 的客户端。
+var settingsStore = new AppSettingsStore(launcherPaths);
+if (!NetworkPolicy.TryApply(settingsStore.Load(), out var proxyError) && proxyError is not null)
+{
+    Console.Error.WriteLine($"警告：代理设置未生效（{proxyError}），继续使用当前代理。");
+}
+
+var manifestClient = new ManifestClient(launcherPaths, sourceMode: () => settingsStore.Load().DownloadSource);
+var loaderMetaClient = new LoaderMetaClient(
+    launcherPaths, sourceMode: () => settingsStore.Load().DownloadSource);
 var resolver = new VersionResolver(manifestClient, launcherPaths, loaderMetaClient);
 var javaLocator = new JavaLocator(launcherPaths);
 
-var settingsStore = new AppSettingsStore(launcherPaths);
 var sqlite = new SqliteStore(launcherPaths);
 sqlite.InitializeAsync().GetAwaiter().GetResult();
-var downloads = new DownloadEngine();
-var loaderCatalog = new LoaderCatalog();
+
+var downloads = new DownloadEngine(sourceMode: () => settingsStore.Load().DownloadSource);
+var javaInstaller = new JavaRuntimeInstaller(
+    launcherPaths, downloads, NullLogger<JavaRuntimeInstaller>.Instance);
+var loaderCatalog = new LoaderCatalog(sourceMode: () => settingsStore.Load().DownloadSource);
 var loaderInstaller = new LoaderInstaller(
     launcherPaths,
     downloads,
     resolver,
     javaLocator,
     settingsStore,
-    NullLogger<LoaderInstaller>.Instance);
+    NullLogger<LoaderInstaller>.Instance,
+    javaInstaller: javaInstaller);
 var installer = new VanillaInstaller(
     launcherPaths,
     resolver,
@@ -66,7 +78,8 @@ var launcher = new LaunchService(
     NullLogger<LaunchService>.Instance,
     accounts,
     microsoft,
-    new AuthlibInjector(launcherPaths, downloads));
+    new AuthlibInjector(launcherPaths, downloads),
+    javaInstaller);
 var facade = new LauncherFacade(
     launcherPaths,
     settingsStore,
