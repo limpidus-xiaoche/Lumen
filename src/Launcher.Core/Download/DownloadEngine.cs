@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Launcher.Protocol;
 
 namespace Launcher.Core.Download;
 
@@ -20,10 +21,12 @@ public sealed class DownloadEngine
     };
 
     private readonly HttpClient _http;
+    private readonly Func<DownloadSourceMode> _sourceMode;
 
-    public DownloadEngine(HttpClient? http = null)
+    public DownloadEngine(HttpClient? http = null, Func<DownloadSourceMode>? sourceMode = null)
     {
         _http = http ?? CreateHttpClient();
+        _sourceMode = sourceMode ?? (static () => DownloadSourceMode.Auto);
     }
 
     public async Task DownloadAsync(
@@ -369,18 +372,54 @@ public sealed class DownloadEngine
         }
     }
 
-    private static IReadOnlyList<string> BuildCandidates(DownloadItem item)
-    {
-        var result = new List<string> { item.Url };
-        if (item.Mirrors is not null)
-        {
-            result.AddRange(item.Mirrors);
-        }
+    private IReadOnlyList<string> BuildCandidates(DownloadItem item) => BuildCandidates(item, _sourceMode());
 
+    /// <summary>
+    /// 按下载源策略生成候选地址：Auto 保持原有顺序，Official 不追加 BMCLAPI，
+    /// Mirror 优先 BMCLAPI 与显式镜像、原始地址作最后兜底。
+    /// </summary>
+    public static IReadOnlyList<string> BuildCandidates(DownloadItem item, DownloadSourceMode mode)
+    {
+        var result = new List<string>();
         var mirrored = MirrorUrl(item.Url);
-        if (!string.Equals(mirrored, item.Url, StringComparison.OrdinalIgnoreCase))
+        var hasMirrored = !string.Equals(mirrored, item.Url, StringComparison.OrdinalIgnoreCase);
+
+        switch (mode)
         {
-            result.Add(mirrored);
+            case DownloadSourceMode.Official:
+                result.Add(item.Url);
+                if (item.Mirrors is not null)
+                {
+                    result.AddRange(item.Mirrors);
+                }
+
+                break;
+            case DownloadSourceMode.Mirror:
+                if (hasMirrored)
+                {
+                    result.Add(mirrored);
+                }
+
+                if (item.Mirrors is not null)
+                {
+                    result.AddRange(item.Mirrors);
+                }
+
+                result.Add(item.Url);
+                break;
+            default:
+                result.Add(item.Url);
+                if (item.Mirrors is not null)
+                {
+                    result.AddRange(item.Mirrors);
+                }
+
+                if (hasMirrored)
+                {
+                    result.Add(mirrored);
+                }
+
+                break;
         }
 
         return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();

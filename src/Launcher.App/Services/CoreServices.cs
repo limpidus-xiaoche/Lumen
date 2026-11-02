@@ -36,19 +36,22 @@ public sealed class CoreServices
         sqlite.InitializeAsync().GetAwaiter().GetResult();
 
         var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
-        var manifest = new ManifestClient(paths);
-        var loaderMeta = new LoaderMetaClient(paths);
+        var manifest = new ManifestClient(paths, sourceMode: () => settings.Load().DownloadSource);
+        var loaderMeta = new LoaderMetaClient(paths, sourceMode: () => settings.Load().DownloadSource);
         var resolver = new VersionResolver(manifest, paths, loaderMeta);
         var javaLocator = new JavaLocator(paths);
-        var downloads = new DownloadEngine();
-        var loaderCatalog = new LoaderCatalog();
+        var downloads = new DownloadEngine(sourceMode: () => settings.Load().DownloadSource);
+        var javaInstaller = new JavaRuntimeInstaller(
+            paths, downloads, loggerFactory.CreateLogger<JavaRuntimeInstaller>());
+        var loaderCatalog = new LoaderCatalog(sourceMode: () => settings.Load().DownloadSource);
         var loaderInstaller = new LoaderInstaller(
             paths,
             downloads,
             resolver,
             javaLocator,
             settings,
-            loggerFactory.CreateLogger<LoaderInstaller>());
+            loggerFactory.CreateLogger<LoaderInstaller>(),
+            javaInstaller: javaInstaller);
         var installer = new VanillaInstaller(
             paths,
             resolver,
@@ -70,7 +73,8 @@ public sealed class CoreServices
             loggerFactory.CreateLogger<LaunchService>(),
             accounts,
             microsoft,
-            authlibInjector);
+            authlibInjector,
+            javaInstaller);
 
         var facade = new LauncherFacade(
             paths,

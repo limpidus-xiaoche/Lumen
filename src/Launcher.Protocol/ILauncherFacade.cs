@@ -58,6 +58,9 @@ public interface ILauncherFacade
         string path, IProgress<ImportProgress> progress, CancellationToken ct);
 
     // 设置
+    /// <summary>CurseForge 是否可用（需要部署配置 API Key）；UI 据此显隐该渠道。</summary>
+    bool IsCurseForgeAvailable { get; }
+
     Task UpdateSettingsAsync(AppSettingsPatch patch, CancellationToken ct);
 
     // 更新

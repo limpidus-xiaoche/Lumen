@@ -5,6 +5,7 @@ using System.Text.Json;
 using Launcher.Core.Accounts;
 using Launcher.Core.Auth;
 using Launcher.Core.Diagnostics;
+using Launcher.Core.Download;
 using Launcher.Core.Install;
 using Launcher.Core.Instances;
 using Launcher.Core.Java;
@@ -82,6 +83,8 @@ public sealed class LauncherFacade : ILauncherFacade
         _modrinth = new ModrinthClient(paths.CacheDir);
         _curseForge = new CurseForgeClient(paths.CacheDir);
     }
+
+    public bool IsCurseForgeAvailable => _curseForge.IsConfigured;
 
     public async Task<LauncherSnapshot> GetSnapshotAsync(CancellationToken ct)
     {
@@ -684,6 +687,11 @@ public sealed class LauncherFacade : ILauncherFacade
             AccentColor = patch.AccentColor ?? current.AccentColor,
         };
         _settingsStore.Save(updated);
+        if (!NetworkPolicy.TryApply(updated, out var proxyError) && proxyError is not null)
+        {
+            _logger.LogWarning("应用代理设置失败：{Error}", proxyError);
+        }
+
         return Task.CompletedTask;
     }
 

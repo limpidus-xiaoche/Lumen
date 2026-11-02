@@ -2,18 +2,47 @@ using System.Collections.ObjectModel;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Launcher.Core.Download;
 using Launcher.Protocol;
 
 namespace Launcher.App.ViewModels;
 
 public partial class SettingsViewModel : ObservableObject
 {
+    public const string DownloadSourceAutoText = "自动（官方优先，失败回退镜像）";
+    public const string DownloadSourceOfficialText = "仅官方";
+    public const string DownloadSourceMirrorText = "仅镜像";
+    public const string ProxyModeSystemText = "系统代理";
+    public const string ProxyModeManualText = "手动";
+    public const string ProxyModeNoneText = "不使用代理";
+
     private readonly ILauncherFacade _facade;
     private readonly InstancesViewModel _instances;
     private readonly LogsViewModel _logs;
     private readonly Action<object> _openSubPage;
 
     public ObservableCollection<JavaRuntime> Javas { get; } = [];
+
+    /// <summary>下载源选项（显示文案与枚举一一对应）。</summary>
+    public ObservableCollection<string> DownloadSources { get; } =
+        [DownloadSourceAutoText, DownloadSourceOfficialText, DownloadSourceMirrorText];
+
+    /// <summary>代理模式选项（显示文案与枚举一一对应）。</summary>
+    public ObservableCollection<string> ProxyModes { get; } =
+        [ProxyModeSystemText, ProxyModeManualText, ProxyModeNoneText];
+
+    [ObservableProperty]
+    private string selectedDownloadSource = DownloadSourceAutoText;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsManualProxy))]
+    private string selectedProxyMode = ProxyModeSystemText;
+
+    [ObservableProperty]
+    private string proxyAddress = string.Empty;
+
+    /// <summary>手动代理地址仅在「手动」模式可编辑。</summary>
+    public bool IsManualProxy => SelectedProxyMode == ProxyModeManualText;
 
     [ObservableProperty]
     private int maxMemoryMb = 4096;
@@ -55,14 +84,83 @@ public partial class SettingsViewModel : ObservableObject
         _instances = instances;
         _logs = logs;
         _openSubPage = openSubPage;
+        _ = LoadSettingsAsync();
     }
 
+    /// <summary>读取当前设置并回填网络与下载控件。</summary>
+    [RelayCommand]
+    private async Task LoadSettingsAsync()
+    {
+        try
+        {
+            var snapshot = await _facade.GetSnapshotAsync(CancellationToken.None);
+            SelectedDownloadSource = DownloadSourceText(snapshot.Settings.DownloadSource);
+            SelectedProxyMode = ProxyModeText(snapshot.Settings.ProxyMode);
+            ProxyAddress = snapshot.Settings.ProxyAddress ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"读取设置失败：{ex.Message}";
+        }
+    }
+
+    /// <summary>保存内存、下载源与代理设置；代理应用结果一并写入状态栏。</summary>
     [RelayCommand]
     private async Task SaveAsync()
     {
-        await _facade.UpdateSettingsAsync(new AppSettingsPatch(MaxMemoryMb: MaxMemoryMb), CancellationToken.None);
-        StatusText = $"已保存：最大内存 {MaxMemoryMb} MB";
+        var patch = new AppSettingsPatch(
+            MaxMemoryMb: MaxMemoryMb,
+            DownloadSource: ParseDownloadSource(SelectedDownloadSource),
+            ProxyMode: ParseProxyMode(SelectedProxyMode),
+            ProxyAddress: string.IsNullOrWhiteSpace(ProxyAddress) ? null : ProxyAddress.Trim());
+        await _facade.UpdateSettingsAsync(patch, CancellationToken.None);
+
+        var applied = true;
+        string? proxyError = null;
+        try
+        {
+            var snapshot = await _facade.GetSnapshotAsync(CancellationToken.None);
+            applied = NetworkPolicy.TryApply(snapshot.Settings, out proxyError);
+        }
+        catch (Exception ex)
+        {
+            applied = false;
+            proxyError = ex.Message;
+        }
+
+        var proxyResult = applied
+            ? $"代理 {SelectedProxyMode} 已应用"
+            : $"代理未生效：{proxyError}";
+        StatusText = $"已保存：最大内存 {MaxMemoryMb} MB，下载源 {SelectedDownloadSource}，{proxyResult}";
     }
+
+    private static string DownloadSourceText(DownloadSourceMode mode) => mode switch
+    {
+        DownloadSourceMode.Official => DownloadSourceOfficialText,
+        DownloadSourceMode.Mirror => DownloadSourceMirrorText,
+        _ => DownloadSourceAutoText,
+    };
+
+    private static DownloadSourceMode ParseDownloadSource(string text) => text switch
+    {
+        DownloadSourceOfficialText => DownloadSourceMode.Official,
+        DownloadSourceMirrorText => DownloadSourceMode.Mirror,
+        _ => DownloadSourceMode.Auto,
+    };
+
+    private static string ProxyModeText(ProxyMode mode) => mode switch
+    {
+        ProxyMode.Manual => ProxyModeManualText,
+        ProxyMode.None => ProxyModeNoneText,
+        _ => ProxyModeSystemText,
+    };
+
+    private static ProxyMode ParseProxyMode(string text) => text switch
+    {
+        ProxyModeManualText => ProxyMode.Manual,
+        ProxyModeNoneText => ProxyMode.None,
+        _ => ProxyMode.System,
+    };
 
     /// <summary>刷新并列出本机检测到的 Java 运行时（真实门面 JavaLocator）。</summary>
     [RelayCommand]

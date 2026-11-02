@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Launcher.App.Views.DeleteInstanceDialog"
+        Title="删除实例"
+        Width="380"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        WindowDecorations="None"
+        Background="{DynamicResource WindowBackground}">
+  <Window.Styles>
+    <Style Selector="Button.dlg-btn">
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.dlg-btn:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentGlow}" />
+    </Style>
+  </Window.Styles>
+
+  <Border Background="{DynamicResource CardBackground}"
+          BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="1"
+          CornerRadius="10"
+          Padding="18"
+          Margin="10">
+    <StackPanel Spacing="12">
+      <Grid ColumnDefinitions="*,Auto" PointerPressed="OnHeaderPointerPressed">
+        <TextBlock Text="删除实例" FontSize="16" FontWeight="SemiBold"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextPrimary}" />
+        <Button Grid.Column="1" Classes="dlg-btn" Content="×" Padding="9,2"
+                Click="OnCancelClick" />
+      </Grid>
+
+      <TextBlock x:Name="MessageText" FontSize="12"
+                 Foreground="{DynamicResource TextSecondary}"
+                 TextWrapping="Wrap" />
+
+      <TextBlock Text="删除后实例目录会被移除；勾选保留存档时，saves / screenshots 会先导出到 exports。"
+                 FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" />
+
+      <CheckBox x:Name="KeepSavesCheck" IsChecked="True"
+                Content="保留存档（saves / screenshots）"
+                FontSize="12"
+                Foreground="{DynamicResource TextSecondary}" />
+
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Classes="dlg-btn" Content="取消" Click="OnCancelClick" />
+        <Button Classes="dlg-btn" Content="删除" Foreground="#FF9B93" Click="OnDeleteClick" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>

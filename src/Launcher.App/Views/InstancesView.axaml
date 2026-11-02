@@ -44,24 +44,48 @@
     </Style>
   </UserControl.Styles>
 
-  <Grid Margin="20,16" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+  <Grid Margin="20,16" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="8">
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
       <StackPanel Grid.Column="0" Spacing="1">
         <TextBlock Text="实例" FontSize="24" FontWeight="Bold"
                    Foreground="{DynamicResource TextPrimary}" />
         <TextBlock Text="左侧启动按钮使用这里选中的实例；卡片可直接启动 / 停止 / 修复"
                    FontSize="11" Foreground="{DynamicResource TextMuted}" />
+        <TextBlock Text="导入现有实例或整合包，数据保留在原目录 / 新实例目录"
+                   FontSize="11" Foreground="{DynamicResource TextMuted}" />
       </StackPanel>
       <Button Grid.Column="1" Classes="card-btn" Content="刷新"
               Command="{Binding LoadCommand}" VerticalAlignment="Center" />
     </Grid>
 
-    <TextBlock Grid.Row="1" Text="{Binding StatusText}" FontSize="11"
-               Foreground="{DynamicResource TextMuted}" />
+    <!-- 导入工具条：外部实例 / 整合包，也接受拖拽 -->
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+      <Button Classes="card-btn" Content="导入外部实例"
+              Click="OnImportInstanceClick"
+              IsEnabled="{Binding IsIdle}" />
+      <Button Classes="card-btn" Content="导入整合包"
+              Click="OnImportModpackClick"
+              IsEnabled="{Binding IsIdle}" />
+      <TextBlock Text="或把实例目录 / .mrpack / .zip 拖入此页"
+                 FontSize="11" Foreground="{DynamicResource TextMuted}"
+                 VerticalAlignment="Center" Margin="4,0,0,0" />
+    </StackPanel>
 
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+    <!-- 状态 + 导入进度 -->
+    <StackPanel Grid.Row="2" Spacing="4">
+      <TextBlock Text="{Binding StatusText}" FontSize="11"
+                 Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" />
+      <ProgressBar IsVisible="{Binding IsImportProgressVisible}"
+                   Minimum="0" Maximum="100"
+                   Value="{Binding ImportPercent}"
+                   IsIndeterminate="{Binding IsImportIndeterminate}"
+                   Height="4" CornerRadius="2" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
-        <TextBlock Text="还没有实例" IsVisible="{Binding IsEmpty}"
+        <TextBlock Text="还没有实例：可到下载页安装版本，或用上方按钮导入实例 / 整合包"
+                   IsVisible="{Binding IsEmpty}"
                    FontSize="13" Foreground="{DynamicResource TextMuted}" Margin="0,18,0,0" />
 
         <ItemsControl ItemsSource="{Binding Instances}">
@@ -128,6 +152,10 @@
                     <Button Classes="card-btn" Content="版本设置"
                             Command="{Binding $parent[ItemsControl].DataContext.OpenVersionSettingsCommand}"
                             CommandParameter="{Binding}" />
+                    <Button Classes="card-btn" Content="删除"
+                            Foreground="#FF9B93"
+                            Click="OnDeleteClick"
+                            IsEnabled="{Binding $parent[ItemsControl].DataContext.IsIdle}" />
                   </StackPanel>
                 </Grid>
               </Border>

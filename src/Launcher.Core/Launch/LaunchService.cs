@@ -24,6 +24,7 @@ public sealed class LaunchService
     private readonly AccountStore? _accounts;
     private readonly MicrosoftAuth? _microsoft;
     private readonly AuthlibInjector? _authlibInjector;
+    private readonly JavaRuntimeInstaller? _javaInstaller;
 
     public LaunchService(
         LauncherPaths paths,
@@ -35,7 +36,8 @@ public sealed class LaunchService
         ILogger<LaunchService> logger,
         AccountStore? accounts = null,
         MicrosoftAuth? microsoft = null,
-        AuthlibInjector? authlibInjector = null)
+        AuthlibInjector? authlibInjector = null,
+        JavaRuntimeInstaller? javaInstaller = null)
     {
         _paths = paths;
         _settings = settings;
@@ -47,6 +49,7 @@ public sealed class LaunchService
         _accounts = accounts;
         _microsoft = microsoft;
         _authlibInjector = authlibInjector;
+        _javaInstaller = javaInstaller;
     }
 
     public async Task<GameSession> LaunchAsync(
@@ -70,7 +73,7 @@ public sealed class LaunchService
             instance.VersionId, instance.Loader, instance.LoaderVersion);
         var detail = await _resolver.ResolveAsync(effectiveVersionId, ct);
         var settings = _settings.Load();
-        var java = SelectJava(detail, settings);
+        var java = await SelectJavaAsync(detail, settings, events, ct);
 
         var rootPath = await _sqlite.GetRootPathAsync(instanceId, ct);
         var gameDir = !string.IsNullOrWhiteSpace(rootPath)
@@ -139,6 +142,7 @@ public sealed class LaunchService
             detail, classpath, gameDir, assetsRoot, assetIndexId, nativesDir, librariesDir,
             variables, settings.MaxMemoryMb, extraJvmArgs, useG1);
 
+        var classpathValue = string.Join(Path.PathSeparator, classpath);
         var estimatedLength = command.Args.Sum(a => (long)a.Length + 3);
         string? argFile = null;
         IReadOnlyList<string> startArgs = command.Args;
@@ -146,11 +150,37 @@ public sealed class LaunchService
         {
             if (java.MajorVersion < 9)
             {
-                throw new LaunchException("E5003", "Java 8 命令行过长，尚未实现 wrapper");
-            }
+                // Java 8 不支持 @argfile：把 classpath 换成缓存目录通配符，命令行缩到几十字符。
+                (string WildcardClasspath, int JarCount, int MissingCount) farm;
+                try
+                {
+                    farm = Java8ClasspathFarm.Prepare(classpath, _paths.CacheDir);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    throw new LaunchException("E5003", $"Java 8 通配 classpath 缓存创建失败：{ex.Message}", ex);
+                }
 
-            argFile = ArgFileWriter.Write(command.Args, java.MajorVersion);
-            startArgs = [$"@{argFile}"];
+                startArgs = ReplaceClasspathArgument(command.Args, classpathValue, farm.WildcardClasspath);
+                _logger.LogInformation(
+                    "Java 8 通配 classpath 已就绪：{JarCount} 个 jar（缺失 {MissingCount}），目录 {Directory}",
+                    farm.JarCount,
+                    farm.MissingCount,
+                    Path.GetDirectoryName(farm.WildcardClasspath));
+
+                estimatedLength = startArgs.Sum(a => (long)a.Length + 3);
+                if (estimatedLength > 24_000)
+                {
+                    throw new LaunchException(
+                        "E5003",
+                        $"Java 8 命令行仍然过长（约 {estimatedLength} 字符），通配 classpath 也无法缩短");
+                }
+            }
+            else
+            {
+                argFile = ArgFileWriter.Write(command.Args, java.MajorVersion);
+                startArgs = [$"@{argFile}"];
+            }
         }
 
         var startInfo = new ProcessStartInfo
@@ -282,6 +312,64 @@ public sealed class LaunchService
         Task.FromResult(_running.GetAlive());
 
     /// <summary>
+    /// 把启动参数里原始的 classpath 拼接串换成通配目录（单个参数，保持位置不变）。
+    /// 兼容 <c>-cp &lt;值&gt;</c> 与 <c>-cp=&lt;值&gt;</c> 两种展开形式。
+    /// </summary>
+    internal static IReadOnlyList<string> ReplaceClasspathArgument(
+        IReadOnlyList<string> args,
+        string classpathValue,
+        string wildcardClasspath)
+    {
+        if (string.IsNullOrEmpty(classpathValue))
+        {
+            throw new LaunchException("E5003", "classpath 为空，无法应用 Java 8 通配 classpath。");
+        }
+
+        var replaced = new List<string>(args.Count);
+        var found = false;
+        foreach (var arg in args)
+        {
+            if (string.Equals(arg, classpathValue, StringComparison.Ordinal))
+            {
+                replaced.Add(wildcardClasspath);
+                found = true;
+                continue;
+            }
+
+            if (TryReplacePrefixed(arg, "-cp=", classpathValue, wildcardClasspath) is { } cpArg)
+            {
+                replaced.Add(cpArg);
+                found = true;
+                continue;
+            }
+
+            if (TryReplacePrefixed(arg, "-classpath=", classpathValue, wildcardClasspath) is { } classpathArg)
+            {
+                replaced.Add(classpathArg);
+                found = true;
+                continue;
+            }
+
+            replaced.Add(arg);
+        }
+
+        if (!found)
+        {
+            throw new LaunchException(
+                "E5003",
+                "启动参数结构异常：未找到 classpath 参数，无法应用 Java 8 通配 classpath。");
+        }
+
+        return replaced;
+    }
+
+    private static string? TryReplacePrefixed(string arg, string prefix, string classpathValue, string wildcardClasspath) =>
+        arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(arg[prefix.Length..], classpathValue, StringComparison.Ordinal)
+            ? prefix + wildcardClasspath
+            : null;
+
+    /// <summary>
     /// 启动凭据来源：显式离线用户名 &gt; 当前激活账户 &gt; 默认离线 Player。
     /// </summary>
     private async Task<LaunchCredentials> ResolveCredentialsAsync(string? username, CancellationToken ct)
@@ -339,6 +427,35 @@ public sealed class LaunchService
         string AccessToken,
         string UserType,
         string? AuthlibServer);
+
+    /// <summary>
+    /// 先按本机/已缓存 Java 选择；仅在 E4001（找不到合适版本）且注入了安装器时，
+    /// 自动下载 Mojang 运行时，再重新探测一次。
+    /// </summary>
+    private async Task<JavaRuntime> SelectJavaAsync(
+        VersionDetail detail,
+        AppSettings settings,
+        IProgress<LaunchEvent> events,
+        CancellationToken ct)
+    {
+        try
+        {
+            return SelectJava(detail, settings);
+        }
+        catch (LaunchException ex) when (ex.ErrorCode == "E4001" && _javaInstaller is not null)
+        {
+            var required = JavaVersionPolicy.RequiredMajor(detail);
+            events.Report(new LaunchEvent(
+                LaunchEventKind.Stdout, $"未找到 Java {required}，正在下载 Mojang 运行时…"));
+
+            var progress = new Progress<string>(
+                message => events.Report(new LaunchEvent(LaunchEventKind.Stdout, message)));
+            await _javaInstaller.EnsureAsync(detail.JavaVersion?.Component, required, progress, ct);
+
+            // JavaLocator 会扫描 shared/runtimes，安装后应能发现新运行时。
+            return SelectJava(detail, settings);
+        }
+    }
 
     private JavaRuntime SelectJava(VersionDetail detail, AppSettings settings)
     {

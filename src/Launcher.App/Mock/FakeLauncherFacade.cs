@@ -283,13 +283,34 @@ public sealed class FakeLauncherFacade : ILauncherFacade
         progress.Report(new InstallProgress(InstallStage.Done, 100, 0, 0, 0, null, "模拟修复完成"));
     }
 
-    public Task<InstanceSummary> InstallModpackAsync(
+    /// <summary>最近一次整合包安装请求（测试用）。</summary>
+    public ModpackInstallRequest? LastModpackRequest { get; private set; }
+
+    public async Task<InstanceSummary> InstallModpackAsync(
         ModpackInstallRequest request, IProgress<InstallProgress> progress, CancellationToken ct)
     {
+        LastModpackRequest = request;
+        var name = string.IsNullOrWhiteSpace(request.InstanceName)
+            ? Path.GetFileNameWithoutExtension(request.FilePath)
+            : request.InstanceName!;
+
+        progress.Report(new InstallProgress(
+            InstallStage.VersionJson, 5, 0, 0, 0, null, $"模拟识别整合包：{name}"));
+        await Task.Delay(100, ct);
+        progress.Report(new InstallProgress(
+            InstallStage.Libraries, 50, 0, 0, 0, null, "模拟下载整合包文件"));
+
+        var result = new InstanceSummary(
+            $"fake-modpack-{Guid.NewGuid():N}", name, "1.21.1", LoaderKind.Fabric, "0.16.0",
+            request.Isolation, InstanceState.Ready, null, null);
         lock (_instanceSync)
         {
-            return Task.FromResult(_instances[0]);
+            _instances.Insert(0, result);
         }
+
+        progress.Report(new InstallProgress(
+            InstallStage.Done, 100, 0, 0, 0, null, "模拟整合包安装完成"));
+        return result;
     }
 
     public Task<GameSession> LaunchAsync(
@@ -466,19 +487,68 @@ public sealed class FakeLauncherFacade : ILauncherFacade
         return Task.FromResult(fileName);
     }
 
-    public Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct) =>
-        Task.CompletedTask;
+    /// <summary>最近一次删除的目标与保留存档选项（测试用）。</summary>
+    public string? LastDeleteInstanceId { get; private set; }
+
+    public bool? LastDeleteKeepSaves { get; private set; }
+
+    public Task DeleteInstanceAsync(string instanceId, bool keepSaves, CancellationToken ct)
+    {
+        LastDeleteInstanceId = instanceId;
+        LastDeleteKeepSaves = keepSaves;
+        lock (_instanceSync)
+        {
+            var index = _instances.FindIndex(i => i.Id == instanceId);
+            if (index < 0)
+            {
+                throw new KeyNotFoundException($"实例不存在：{instanceId}");
+            }
+
+            _instances.RemoveAt(index);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>最近一次导入源路径（测试用）。</summary>
+    public string? LastImportedPath { get; private set; }
 
     public Task<IReadOnlyList<InstanceSummary>> ImportExternalAsync(
         string path, IProgress<ImportProgress> progress, CancellationToken ct)
     {
+        LastImportedPath = path;
+        var label = Path.GetFileName(path.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            label = "外部实例";
+        }
+
+        var result = new InstanceSummary(
+            $"fake-import-{Guid.NewGuid():N}", $"导入 {label}", "1.21.1", LoaderKind.Vanilla, null,
+            IsolationLevel.ModsConfig, InstanceState.Ready, null, null);
+
+        progress.Report(new ImportProgress("detect", 0, 0, 0, "vanilla"));
+        progress.Report(new ImportProgress("copy", 50, 0, 0, label));
         lock (_instanceSync)
         {
-            return Task.FromResult<IReadOnlyList<InstanceSummary>>(_instances.ToArray());
+            _instances.Insert(0, result);
         }
+
+        progress.Report(new ImportProgress("done", 100, 0, 0, label));
+        return Task.FromResult<IReadOnlyList<InstanceSummary>>([result]);
     }
 
-    public Task UpdateSettingsAsync(AppSettingsPatch patch, CancellationToken ct) => Task.CompletedTask;
+    public bool IsCurseForgeAvailable => true;
+
+    /// <summary>最近一次保存的设置补丁（测试用）。</summary>
+    public AppSettingsPatch? LastSettingsPatch { get; private set; }
+
+    public Task UpdateSettingsAsync(AppSettingsPatch patch, CancellationToken ct)
+    {
+        LastSettingsPatch = patch;
+        return Task.CompletedTask;
+    }
 
     public Task<UpdateInfo?> CheckUpdateAsync(CancellationToken ct) =>
         Task.FromResult<UpdateInfo?>(null);

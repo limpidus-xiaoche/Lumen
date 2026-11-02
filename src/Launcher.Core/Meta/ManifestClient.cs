@@ -21,11 +21,14 @@ public sealed class ManifestClient
 
     private readonly LauncherPaths _paths;
     private readonly HttpClient _http;
+    private readonly Func<DownloadSourceMode> _sourceMode;
 
-    public ManifestClient(LauncherPaths paths, HttpClient? http = null)
+    public ManifestClient(
+        LauncherPaths paths, HttpClient? http = null, Func<DownloadSourceMode>? sourceMode = null)
     {
         _paths = paths;
         _http = http ?? CreateHttpClient();
+        _sourceMode = sourceMode ?? (static () => DownloadSourceMode.Auto);
     }
 
     public async Task<VersionManifest> GetManifestAsync(bool force, CancellationToken ct = default)
@@ -39,16 +42,7 @@ public sealed class ManifestClient
             return ParseManifest(File.ReadAllText(cache));
         }
 
-        string json;
-        try
-        {
-            json = await _http.GetStringAsync(OfficialManifest, ct);
-        }
-        catch (Exception) when (!ct.IsCancellationRequested)
-        {
-            json = await _http.GetStringAsync(MirrorManifest, ct);
-        }
-
+        var json = await GetFirstAvailableAsync(BuildManifestCandidates(_sourceMode()), ct);
         AtomicFile.WriteAllText(cache, json);
         return ParseManifest(json);
     }
@@ -92,20 +86,79 @@ public sealed class ManifestClient
 
     private async Task<string> GetWithMirrorAsync(string url, CancellationToken ct)
     {
-        try
+        var candidates = BuildDetailCandidates(url, _sourceMode());
+        Exception? first = null;
+        foreach (var candidate in candidates)
         {
-            return await _http.GetStringAsync(url, ct);
-        }
-        catch (Exception) when (!ct.IsCancellationRequested)
-        {
-            var mirror = MapMirror(url);
-            if (string.Equals(mirror, url, StringComparison.OrdinalIgnoreCase))
+            try
             {
-                throw;
+                return await _http.GetStringAsync(candidate, ct);
             }
-
-            return await _http.GetStringAsync(mirror, ct);
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                first ??= ex;
+            }
         }
+
+        throw first ?? new HttpRequestException($"版本 JSON 下载失败：{url}");
+    }
+
+    private async Task<string> GetFirstAvailableAsync(IReadOnlyList<Uri> candidates, CancellationToken ct)
+    {
+        Exception? first = null;
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                return await _http.GetStringAsync(candidate, ct);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                first ??= ex;
+            }
+        }
+
+        throw first ?? new HttpRequestException("版本清单下载失败");
+    }
+
+    /// <summary>版本清单候选地址：Auto 官方优先，Official 仅官方，Mirror 镜像优先且官方兜底。</summary>
+    public static IReadOnlyList<Uri> BuildManifestCandidates(DownloadSourceMode mode) => mode switch
+    {
+        DownloadSourceMode.Official => [OfficialManifest],
+        DownloadSourceMode.Mirror => [MirrorManifest, OfficialManifest],
+        _ => [OfficialManifest, MirrorManifest],
+    };
+
+    /// <summary>版本 JSON 候选地址：Official 仅原 URL，Mirror 先镜像后原 URL，Auto 原 URL 优先。</summary>
+    public static IReadOnlyList<string> BuildDetailCandidates(string url, DownloadSourceMode mode)
+    {
+        var mirror = MapMirror(url);
+        var hasMirror = !string.Equals(mirror, url, StringComparison.OrdinalIgnoreCase);
+        var result = new List<string>();
+        switch (mode)
+        {
+            case DownloadSourceMode.Official:
+                result.Add(url);
+                break;
+            case DownloadSourceMode.Mirror:
+                if (hasMirror)
+                {
+                    result.Add(mirror);
+                }
+
+                result.Add(url);
+                break;
+            default:
+                result.Add(url);
+                if (hasMirror)
+                {
+                    result.Add(mirror);
+                }
+
+                break;
+        }
+
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     public static string MapMirror(string url) =>
