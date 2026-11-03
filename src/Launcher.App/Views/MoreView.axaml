@@ -13,7 +13,7 @@
           <TextBlock Text="关于 Lumen" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
           <TextBlock Text="{Binding AppVersion, StringFormat='版本 {0}'}"
                      FontSize="12" Foreground="{DynamicResource TextSecondary}" />
-          <TextBlock Text="由 麦谷Limpidus 开发。轻量、简洁的 Minecraft 启动器，专注于干净的启动体验。"
+          <TextBlock Text="由 汤汤水水4096 开发。轻量、简洁的 Minecraft 启动器，专注于干净的启动体验。"
                      FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" />
           <Button Content="项目主页" Command="{Binding OpenProjectPageCommand}"
                   HorizontalAlignment="Left" Padding="14,8" CornerRadius="8" FontSize="12" />

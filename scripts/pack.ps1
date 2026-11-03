@@ -80,7 +80,7 @@ dotnet vpk pack `
     --packDir $publishDir `
     --mainExe Lumen.exe `
     --packTitle 'Lumen Launcher' `
-    --packAuthors 'Lumen' `
+    --packAuthors '汤汤水水4096' `
     --runtime $Runtime `
     --channel $Channel `
     --outputDir $releasesDir
